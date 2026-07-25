@@ -1,0 +1,20 @@
+{
+    "KPlugin": {
+        "Authors": [
+            {
+                "Name": "Vladimir M"
+            }
+        ],
+        "Category": "Environment and Weather",
+        "Description": "A weather widget using the free Open-Meteo API",
+        "Description[ru]": "Виджет погоды с использованием бесплатного API Open-Meteo",
+        "Icon": "weather-clouds",
+        "Id": "com.github.vladimirm.openmeteo-weather",
+        "Name": "Open-Meteo Weather",
+        "Name[ru]": "Погода Open-Meteo",
+        "Version": "1.0",
+        "License": "MIT"
+    },
+    "X-Plasma-API-Minimum-Version": "6.0",
+    "KPackageStructure": "Plasma/Applet"
+}

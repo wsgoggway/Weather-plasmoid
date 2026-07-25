@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kcfg xmlns="http://www.kde.org/standards/kcfg/1.0"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="http://www.kde.org/standards/kcfg/1.0
+      http://www.kde.org/standards/kcfg/1.0/kcfg.xsd">
+    <kcfgfile name=""/>
+    <group name="General">
+        <entry name="latitude" type="Double">
+            <default>55.7558</default>
+        </entry>
+        <entry name="longitude" type="Double">
+            <default>37.6173</default>
+        </entry>
+        <entry name="cityName" type="String">
+            <default>Moscow</default>
+        </entry>
+        <entry name="timezone" type="String">
+            <default>Europe/Moscow</default>
+        </entry>
+        <entry name="updateInterval" type="Int">
+            <default>30</default>
+        </entry>
+        <entry name="showForecast" type="Bool">
+            <default>true</default>
+        </entry>
+        <entry name="forecastDays" type="Int">
+            <default>7</default>
+        </entry>
+        <entry name="temperatureUnit" type="String">
+            <default>celsius</default>
+        </entry>
+        <entry name="windSpeedUnit" type="String">
+            <default>ms</default>
+        </entry>
+        <entry name="forecastMode" type="String">
+            <default>daily</default>
+        </entry>
+    </group>
+</kcfg>
