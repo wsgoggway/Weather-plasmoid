@@ -353,7 +353,13 @@ PlasmoidItem {
                     for (var k = 0; k < count; k++) {
                         var idx = Math.floor(Math.random() * pool.length)
                         var e = pool[idx]
-                        if (e && e.text) picks.push({ year: e.year || "?", text: e.text })
+                        if (e && e.text) {
+                            var url = ""
+                            var pg = e.pages && e.pages.length ? e.pages[0] : null
+                            if (pg && pg.content_urls && pg.content_urls.desktop)
+                                url = pg.content_urls.desktop.page || ""
+                            picks.push({ year: e.year || "?", text: e.text, url: url })
+                        }
                         pool.splice(idx, 1)
                     }
                     _historyEvents = picks

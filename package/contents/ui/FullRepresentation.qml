@@ -424,12 +424,21 @@ Item {
                     model: plasmoidItem ? plasmoidItem._historyEvents : []
                     PlasmaComponents.Label {
                         Layout.fillWidth: true
+                        property string _url: modelData.url || ""
                         text: "📜 " + (modelData.year || "?") + ": " + (modelData.text || "")
+                              + (_url.length ? "  ↗" : "")
                         font.pixelSize: Kirigami.Units.gridUnit * 0.78
-                        color: fullRoot.subtleColor
+                        color: histMa.containsMouse ? fullRoot.accentColor : fullRoot.subtleColor
                         wrapMode: Text.WordWrap
                         elide: Text.ElideRight
                         maximumLineCount: 2
+                        MouseArea {
+                            id: histMa
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: parent._url.length ? Qt.PointingHandCursor : Qt.ArrowCursor
+                            onClicked: if (parent._url.length) Qt.openUrlExternally(parent._url)
+                        }
                     }
                 }
             }
