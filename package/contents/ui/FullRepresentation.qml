@@ -20,9 +20,12 @@ Item {
     required property PlasmoidItem plasmoidItem
 
     Layout.minimumWidth: Kirigami.Units.gridUnit * 20
-    Layout.minimumHeight: Kirigami.Units.gridUnit * 22
+    Layout.minimumHeight: Kirigami.Units.gridUnit * 16
     Layout.preferredWidth: Kirigami.Units.gridUnit * 25
-    Layout.preferredHeight: Kirigami.Units.gridUnit * 34
+    // Auto-height: the popup grows to fit its content. Plasma clamps it to the
+    // screen; the Flickable only scrolls when content exceeds that (and then
+    // contentHeight reaches the very last day). Floor = minimumHeight.
+    Layout.preferredHeight: contentCol.implicitHeight + fullRoot.pad * 2
 
     property bool showLoading: !plasmoidItem || plasmoidItem._loading
     property bool showError: plasmoidItem ? plasmoidItem._errorMessage.length > 0 : false
