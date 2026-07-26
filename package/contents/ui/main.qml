@@ -36,6 +36,7 @@ PlasmoidItem {
     property var _historyEvents: []
     property string _holidaysText: ""
     property string _historyDate: ""
+    property string _holidaysDate: ""
 
     // ── Layout ──────────────────────────────────────────────────────────────
     switchWidth: Kirigami.Units.gridUnit * 12
@@ -309,34 +310,94 @@ PlasmoidItem {
             "1-8":  "🎊 Новогодние каникулы",
             "1-14": "📅 Старый Новый год",
             "1-25": "🎓 День студента (Татьянин день)",
+            "2-8":  "🔬 День российской науки",
+            "2-10": "💼 День дипломатического работника",
             "2-14": "💝 День святого Валентина",
             "2-23": "🇷🇺 День защитника Отечества",
             "3-8":  "🌷 Международный женский день",
+            "3-25": "🎭 День работника культуры",
+            "3-27": "🎫 День театра",
             "4-1":  "🤡 День смеха",
             "4-12": "🚀 День космонавтики",
             "5-1":  "🛠️ Праздник Весны и Труда",
+            "5-7":  "📻 День радио",
             "5-9":  "🎖️ День Победы",
+            "5-24": "📜 День славянской письменности и культуры",
+            "5-28": "🛡️ День пограничника",
             "6-1":  "🧸 День защиты детей",
             "6-6":  "📖 День русского языка",
             "6-12": "🇷🇺 День России",
+            "6-27": "🌟 День молодёжи",
             "7-8":  "💑 День семьи, любви и верности",
+            "8-22": "🚩 День Государственного флага РФ",
+            "8-27": "🎬 День российского кино",
             "9-1":  "📚 День знаний",
+            "10-1": "👴 День пожилого человека",
             "10-5": "👨‍🏫 Всемирный день учителя",
             "11-4": "🇷🇺 День народного единства",
+            "11-7": "🎖️ День воинской славы (1941)",
+            "12-9": "🏅 День Героев Отечества",
+            "12-12":"⚖️ День Конституции РФ",
             "12-31":"🎄 Канун Нового года"
         }
         return h[mm + "-" + dd] || ""
     }
 
-    // ── "This day in history" via Wikipedia REST API (ru) ───────────────────
+    // ── Today: holidays (htmlweb.ru, daily) + history (Wikipedia, daily) ───
+    // Both are fetched at most once per day (cached by date). On any failure
+    // (network, rate-limit) we keep the offline holiday dictionary fallback.
     function fetchThisDay() {
         var now = new Date()
         var mm = now.getMonth() + 1
         var dd = now.getDate()
         var key = now.getFullYear() + "-" + mm + "-" + dd
-        _holidaysText = holidaysForMonthDay(mm, dd)
+
+        // Holidays: once per day. Offline dict is the immediate fallback;
+        // htmlweb.ru (richer) overwrites _holidaysText on success only.
+        if (_holidaysDate !== key) {
+            _holidaysDate = key
+            _holidaysText = holidaysForMonthDay(mm, dd)
+            fetchHolidaysHtmlweb(mm, dd, now.getFullYear())
+        }
+
+        // History: once per day.
         if (_historyDate === key && _historyEvents.length > 0) return
         _historyDate = key
+        fetchHistoryWikipedia(mm, dd)
+    }
+
+    // Rich holidays from htmlweb.ru (keyless, ~20 req/day/IP → called once/day).
+    // On any error/limit we keep the offline fallback already in _holidaysText.
+    function fetchHolidaysHtmlweb(mm, dd, year) {
+        var pad2 = function(n) { return (n < 10 ? "0" : "") + n }
+        var ds = pad2(dd) + "." + pad2(mm) + "." + year
+        var xhr = new XMLHttpRequest()
+        xhr.open("GET", "https://htmlweb.ru/json/calendar/list?d_from=" + ds + "&d_to=" + ds + "&country=RU")
+        xhr.timeout = 10000
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState === XMLHttpRequest.DONE && xhr.status === 200) {
+                try {
+                    var data = JSON.parse(xhr.responseText)
+                    if (data && data.status === 200 && data.holidays) {
+                        var skip = /^(Выходной день|Выходной|Дополнительный выходной|Рабочий день)$/i
+                        var names = []
+                        for (var i = 0; i < data.holidays.length; i++) {
+                            var n = (data.holidays[i].name || "").trim()
+                            if (n && !skip.test(n) && names.indexOf(n) === -1) names.push(n)
+                        }
+                        if (names.length) _holidaysText = "🎉 " + names.join(", ")
+                    }
+                } catch (err) {}
+            }
+        }
+        xhr.ontimeout = function() {}
+        xhr.onerror   = function() {}
+        xhr.send()
+    }
+
+    // "This day in history" via Wikipedia REST API (ru) — pick 3 random events
+    // with their article URL.
+    function fetchHistoryWikipedia(mm, dd) {
         var mms = (mm < 10 ? "0" : "") + mm
         var dds = (dd < 10 ? "0" : "") + dd
         var xhr = new XMLHttpRequest()
@@ -352,18 +413,18 @@ PlasmoidItem {
                     var count = Math.min(3, pool.length)
                     for (var k = 0; k < count; k++) {
                         var idx = Math.floor(Math.random() * pool.length)
-                        var e = pool[idx]
-                        if (e && e.text) {
+                        var ev = pool[idx]
+                        if (ev && ev.text) {
                             var url = ""
-                            var pg = e.pages && e.pages.length ? e.pages[0] : null
+                            var pg = ev.pages && ev.pages.length ? ev.pages[0] : null
                             if (pg && pg.content_urls && pg.content_urls.desktop)
                                 url = pg.content_urls.desktop.page || ""
-                            picks.push({ year: e.year || "?", text: e.text, url: url })
+                            picks.push({ year: ev.year || "?", text: ev.text, url: url })
                         }
                         pool.splice(idx, 1)
                     }
                     _historyEvents = picks
-                } catch (e) {}
+                } catch (err) {}
             }
         }
         xhr.ontimeout = function() {}
