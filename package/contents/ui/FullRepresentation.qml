@@ -2,23 +2,22 @@ import QtQuick 2.15
 import QtQuick.Layouts 1.15
 import QtQuick.Controls 2.15
 import org.kde.plasma.components 3.0 as PlasmaComponents
-import org.kde.plasma.extras 2.0 as PlasmaExtras
-import org.kde.kirigami 2.20 as Kirigami
 import org.kde.plasma.plasmoid 2.0
+import org.kde.kirigami 2.20 as Kirigami
 
 /*
- * Full representation — popup / desktop.
- * Card-based layout: centered hero (temp + feels-like quip), conditions grid,
- * day-metrics strip (sunrise/sunset/UV/precip), "today" card (holidays +
- * this day in history), and forecast.
- * plasmoidItem is set by PlasmoidItem automatically (official Plasma 6 API).
+ * Full representation — dark-glass card matching new_template.html.
+ * Sections: location header (big thin temp + feels-like right + italic quip),
+ * 3×2 metrics grid, hourly forecast (horizontal), divider, daily forecast
+ * (vertical rows with gradient temp-bars), and an optional "Сегодня" block
+ * (holidays + this day in history).
  */
 Item {
     id: fullRoot
 
     required property PlasmoidItem plasmoidItem
 
-    Layout.minimumWidth: Kirigami.Units.gridUnit * 19
+    Layout.minimumWidth: Kirigami.Units.gridUnit * 20
     Layout.minimumHeight: Kirigami.Units.gridUnit * 22
     Layout.preferredWidth: Kirigami.Units.gridUnit * 25
     Layout.preferredHeight: Kirigami.Units.gridUnit * 34
@@ -26,116 +25,137 @@ Item {
     property bool showLoading: !plasmoidItem || plasmoidItem._loading
     property bool showError: plasmoidItem ? plasmoidItem._errorMessage.length > 0 : false
     property bool showContent: plasmoidItem && !plasmoidItem._loading && !showError
-    property int forecastTab: 0
 
-    // theme-aware styling
-    readonly property color cardColor: Kirigami.Theme.alternateBackgroundColor
-    readonly property color mutedColor: Kirigami.Theme.disabledTextColor
-    readonly property color accentColor: Kirigami.Theme.highlightColor
-    readonly property color negColor: Kirigami.Theme.negativeTextColor
-    readonly property int cardRadius: Math.round(Kirigami.Units.largeSpacing * 0.8)
-    readonly property int hPad: Kirigami.Units.gridUnit
-    readonly property int cardPad: Math.round(Kirigami.Units.largeSpacing * 0.8)
+    // ── dark-glass palette (from new_template.html) ─────────────────────────
+    readonly property color textColor: "#ffffff"
+    readonly property color subtleColor: Qt.rgba(1, 1, 1, 0.6)
+    readonly property color glassColor: Qt.rgba(30/255, 30/255, 40/255, 0.85)
+    readonly property color cardColor: Qt.rgba(1, 1, 1, 0.05)
+    readonly property color dividerColor: Qt.rgba(1, 1, 1, 0.1)
+    readonly property color accentColor: "#3daee9"
+    readonly property color barCold: "#4fc3f7"
+    readonly property color barWarm: "#ffb74d"
+    readonly property color negColor: "#ef4f4f"
+    readonly property int pad: Kirigami.Units.gridUnit * 1.5
 
     function forecastMode() { return plasmoid.configuration.forecastMode || "daily" }
     function showDaily()  { return forecastMode() === "daily"  || forecastMode() === "both" }
     function showHourly() { return forecastMode() === "hourly" || forecastMode() === "both" }
 
-    // ── Reusable centered hero / detail helpers via components ──────────────
-    function precipText() {
-        if (!plasmoidItem) return "--"
-        return plasmoidItem._precipSum + " мм"
+    function sunText() {
+        if (!plasmoidItem) return "--:–"
+        return (plasmoidItem._sunrise || "--:--") + " – " + (plasmoidItem._sunset || "--:--")
+    }
+
+    // weekday from ISO date (timezone-safe, Sakamoto) ; index 0 → "Сегодня"
+    function dayLabel(dateStr, idx) {
+        if (idx === 0) return "Сегодня"
+        if (!dateStr) return ""
+        var p = dateStr.substring(0, 10).split("-")
+        if (p.length < 3) return ""
+        var y = +p[0], m = +p[1], d = +p[2]
+        var tm = [0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4]
+        var yy = m < 3 ? y - 1 : y
+        var wd = (yy + Math.floor(yy/4) - Math.floor(yy/100) + Math.floor(yy/400) + tm[m-1] + d) % 7
+        return ["Вс","Пн","Вт","Ср","Чт","Пт","Сб"][wd]
+    }
+
+    // week-wide min/max → positions the daily temp-bars
+    readonly property var _fc: plasmoidItem ? plasmoidItem._forecasts : []
+    readonly property real weekMin: {
+        if (!_fc.length) return 0
+        var m = _fc[0].temp_min
+        for (var i = 1; i < _fc.length; i++) if (_fc[i].temp_min < m) m = _fc[i].temp_min
+        return m
+    }
+    readonly property real weekMax: {
+        if (!_fc.length) return 1
+        var m = _fc[0].temp_max
+        for (var i = 1; i < _fc.length; i++) if (_fc[i].temp_max > m) m = _fc[i].temp_max
+        return m
     }
 
     Flickable {
         anchors.fill: parent
         contentWidth: width
-        contentHeight: mainColumn.implicitHeight + Kirigami.Units.largeSpacing
+        contentHeight: card.implicitHeight
         clip: true
         boundsBehavior: Flickable.StopAtBounds
 
-        ColumnLayout {
-            id: mainColumn
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.margins: Kirigami.Units.largeSpacing
-            spacing: Kirigami.Units.largeSpacing
+        // ── the glass card ──────────────────────────────────────────────
+        Rectangle {
+            id: card
+            width: parent.width
+            color: fullRoot.glassColor
+            radius: Kirigami.Units.gridUnit * 1.1
+            border.color: fullRoot.dividerColor
+            border.width: 1
+            // make Plasma/Kirigami controls inside use the light-on-dark theme
+            Kirigami.Theme.textColor: fullRoot.textColor
+            Kirigami.Theme.disabledTextColor: fullRoot.subtleColor
+            Kirigami.Theme.backgroundColor: "#1e1e28"
+            Kirigami.Theme.highlightColor: fullRoot.accentColor
 
-            // ── Header ────────────────────────────────────────────────────
-            RowLayout {
-                Layout.fillWidth: true
-                spacing: Kirigami.Units.smallSpacing
+            implicitHeight: contentCol.implicitHeight + fullRoot.pad * 2
 
-                PlasmaComponents.Label {
-                    text: "📍 " + (plasmoid.configuration.cityName || "Погода")
-                    font.pixelSize: Kirigami.Units.gridUnit * 1.25
-                    font.bold: true
-                    elide: Text.ElideRight
+            ColumnLayout {
+                id: contentCol
+                anchors.fill: parent
+                anchors.margins: fullRoot.pad
+                spacing: Kirigami.Units.gridUnit * 1.25
+
+                // ── Location + actions ──────────────────────────────────────
+                RowLayout {
                     Layout.fillWidth: true
-                }
-                PlasmaComponents.Label {
-                    text: plasmoidItem && plasmoidItem._lastUpdate
-                          ? "обновлено " + plasmoidItem._lastUpdate : ""
-                    font.pixelSize: Kirigami.Units.gridUnit * 0.72
-                    color: fullRoot.mutedColor
-                    visible: text.length > 0
-                    Layout.rightMargin: Kirigami.Units.smallSpacing
-                }
-                PlasmaComponents.ToolButton {
-                    icon.name: "search"
-                    onClicked: {
-                        var city = plasmoid.configuration.cityName
-                        if (city && plasmoidItem)
-                            plasmoidItem.geocodeCity(city, function(lat, lon, name, tz) {
-                                if (lat) plasmoidItem.writeLocation(lat, lon, name, tz)
-                            })
-                    }
-                    PlasmaComponents.ToolTip { text: "Найти координаты по названию города" }
-                }
-                PlasmaComponents.ToolButton {
-                    icon.name: "find-location"
-                    onClicked: { if (plasmoidItem) plasmoidItem.detectLocation() }
-                    PlasmaComponents.ToolTip { text: "Определить местоположение по IP" }
-                }
-                PlasmaComponents.ToolButton {
-                    icon.name: "view-refresh"
-                    onClicked: { if (plasmoidItem) plasmoidItem.fetchWeather() }
-                    PlasmaComponents.ToolTip { text: "Обновить" }
-                }
-            }
-
-            // ── Loading ───────────────────────────────────────────────────
-            PlasmaComponents.BusyIndicator {
-                Layout.alignment: Qt.AlignCenter
-                Layout.topMargin: Kirigami.Units.gridUnit * 3
-                running: fullRoot.showLoading
-                visible: fullRoot.showLoading
-            }
-            PlasmaComponents.Label {
-                visible: fullRoot.showLoading
-                Layout.alignment: Qt.AlignHCenter
-                text: "Загрузка погоды…"
-                color: fullRoot.mutedColor
-            }
-
-            // ── Error card ────────────────────────────────────────────────
-            Rectangle {
-                Layout.fillWidth: true
-                visible: fullRoot.showError
-                color: fullRoot.cardColor
-                radius: fullRoot.cardRadius
-                implicitHeight: errCol.implicitHeight + Kirigami.Units.gridUnit * 1.6
-                ColumnLayout {
-                    id: errCol
-                    anchors.fill: parent
-                    anchors.margins: fullRoot.hPad * 0.8
                     spacing: Kirigami.Units.smallSpacing
                     PlasmaComponents.Label {
-                        text: "⚠️"; font.pixelSize: Kirigami.Units.gridUnit * 2
-                        Layout.alignment: Qt.AlignHCenter
+                        text: (plasmoid.configuration.cityName || "Погода")
+                        font.pixelSize: Kirigami.Units.gridUnit * 1.15
+                        font.weight: Font.Medium
+                        color: fullRoot.textColor
+                        elide: Text.ElideRight
+                        Layout.fillWidth: true
                     }
+                    PlasmaComponents.ToolButton {
+                        icon.name: "search"
+                        onClicked: {
+                            var city = plasmoid.configuration.cityName
+                            if (city && plasmoidItem)
+                                plasmoidItem.geocodeCity(city, function(lat, lon, name, tz) {
+                                    if (lat) plasmoidItem.writeLocation(lat, lon, name, tz)
+                                })
+                        }
+                        PlasmaComponents.ToolTip { text: "Найти координаты по городу" }
+                    }
+                    PlasmaComponents.ToolButton {
+                        icon.name: "find-location"
+                        onClicked: { if (plasmoidItem) plasmoidItem.detectLocation() }
+                        PlasmaComponents.ToolTip { text: "Определить по IP" }
+                    }
+                    PlasmaComponents.ToolButton {
+                        icon.name: "view-refresh"
+                        onClicked: { if (plasmoidItem) plasmoidItem.fetchWeather() }
+                        PlasmaComponents.ToolTip { text: "Обновить" }
+                    }
+                }
+
+                // ── Loading ─────────────────────────────────────────────────
+                PlasmaComponents.BusyIndicator {
+                    Layout.alignment: Qt.AlignHCenter
+                    Layout.topMargin: Kirigami.Units.gridUnit * 2
+                    running: fullRoot.showLoading
+                    visible: fullRoot.showLoading
+                }
+
+                // ── Error ───────────────────────────────────────────────────
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    Layout.topMargin: Kirigami.Units.gridUnit * 2
+                    visible: fullRoot.showError
+                    spacing: Kirigami.Units.smallSpacing
                     PlasmaComponents.Label {
-                        text: plasmoidItem ? (plasmoidItem._errorMessage || "") : ""
+                        Layout.alignment: Qt.AlignHCenter
+                        text: "⚠️ " + (plasmoidItem ? (plasmoidItem._errorMessage || "") : "")
                         color: fullRoot.negColor
                         wrapMode: Text.WordWrap
                         horizontalAlignment: Text.AlignHCenter
@@ -147,348 +167,262 @@ Item {
                         onClicked: { if (plasmoidItem) plasmoidItem.fetchWeather() }
                     }
                 }
-            }
 
-            // ── Hero card (CENTERED): emoji + temp + condition + quip ──────
-            Rectangle {
-                id: heroCard
-                Layout.fillWidth: true
-                visible: fullRoot.showContent
-                color: fullRoot.cardColor
-                radius: fullRoot.cardRadius
-                implicitHeight: heroCol.implicitHeight + Kirigami.Units.gridUnit * 2.5
+                // ════════════ CONTENT ═══════════════════════════════════════
 
+                // ── Current weather (header) ────────────────────────────────
                 ColumnLayout {
-                    id: heroCol
-                    anchors.fill: parent
-                    anchors.margins: fullRoot.hPad
-                    spacing: Kirigami.Units.smallSpacing * 0.6
+                    Layout.fillWidth: true
+                    spacing: Kirigami.Units.gridUnit * 0.6
+                    visible: fullRoot.showContent
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: Kirigami.Units.gridUnit
+
+                        PlasmaComponents.Label {
+                            text: plasmoidItem ? (plasmoidItem._currentEmoji || "🌈") : "🌈"
+                            font.pixelSize: Kirigami.Units.gridUnit * 4.2
+                            Layout.alignment: Qt.AlignVCenter
+                        }
+                        PlasmaComponents.Label {
+                            text: plasmoidItem
+                                ? (plasmoidItem._currentTemp + plasmoidItem._tempUnitLabel)
+                                : "--°"
+                            font.pixelSize: Kirigami.Units.gridUnit * 3.3
+                            font.weight: Font.Light
+                            color: fullRoot.textColor
+                            Layout.alignment: Qt.AlignVCenter
+                        }
+                        Item { Layout.fillWidth: true }
+                        ColumnLayout {
+                            Layout.alignment: Qt.AlignVCenter
+                            spacing: 0
+                            PlasmaComponents.Label {
+                                Layout.fillWidth: true
+                                text: "Ощущается как"
+                                font.pixelSize: Kirigami.Units.gridUnit * 0.8
+                                color: fullRoot.subtleColor
+                                horizontalAlignment: Text.AlignRight
+                            }
+                            PlasmaComponents.Label {
+                                Layout.fillWidth: true
+                                text: plasmoidItem
+                                    ? (plasmoidItem._currentFeelsLike + plasmoidItem._tempUnitLabel)
+                                    : "--°"
+                                font.pixelSize: Kirigami.Units.gridUnit * 0.8
+                                color: fullRoot.subtleColor
+                                horizontalAlignment: Text.AlignRight
+                            }
+                        }
+                    }
 
                     PlasmaComponents.Label {
-                        Layout.alignment: Qt.AlignHCenter
-                        text: plasmoidItem ? (plasmoidItem._currentEmoji || "🌈") : "🌈"
-                        font.pixelSize: Kirigami.Units.gridUnit * 4.5
-                    }
-                    PlasmaComponents.Label {
-                        Layout.alignment: Qt.AlignHCenter
-                        text: plasmoidItem
-                            ? (plasmoidItem._currentTemp + plasmoidItem._tempUnitLabel)
-                            : "--°"
-                        font.pixelSize: Kirigami.Units.gridUnit * 3.4
-                        font.bold: true
-                    }
-                    PlasmaComponents.Label {
-                        Layout.alignment: Qt.AlignHCenter
-                        text: plasmoidItem ? (plasmoidItem._currentConditionRu || "") : ""
-                        font.pixelSize: Kirigami.Units.gridUnit * 1.1
-                        color: fullRoot.mutedColor
-                    }
-                    PlasmaComponents.Label {
-                        Layout.alignment: Qt.AlignHCenter
-                        text: plasmoidItem
-                            ? "ощущается " + plasmoidItem._currentFeelsLike + plasmoidItem._tempUnitLabel
-                            : ""
-                        font.pixelSize: Kirigami.Units.gridUnit * 0.85
-                        color: fullRoot.mutedColor
-                    }
-                    PlasmaComponents.Label {
-                        Layout.alignment: Qt.AlignHCenter
                         Layout.fillWidth: true
-                        Layout.topMargin: Kirigami.Units.smallSpacing
                         text: plasmoidItem ? (plasmoidItem._feelsJokeText || "") : ""
-                        font.pixelSize: Kirigami.Units.gridUnit * 0.82
+                        font.pixelSize: Kirigami.Units.gridUnit * 0.88
                         font.italic: true
-                        color: fullRoot.accentColor
-                        horizontalAlignment: Text.AlignHCenter
+                        color: fullRoot.subtleColor
                         wrapMode: Text.WordWrap
                         visible: text.length > 0
                     }
                 }
-            }
 
-            // ── Current conditions grid (2×2) ─────────────────────────────
-            GridLayout {
-                Layout.fillWidth: true
-                visible: fullRoot.showContent
-                columns: 2
-                rowSpacing: Kirigami.Units.smallSpacing
-                columnSpacing: Kirigami.Units.smallSpacing
-
-                Rectangle { // Wind
+                // ── Metrics grid (3×2) ──────────────────────────────────────
+                Rectangle {
                     Layout.fillWidth: true
-                    color: fullRoot.cardColor; radius: fullRoot.cardRadius
-                    implicitHeight: windRow.implicitHeight + Kirigami.Units.largeSpacing
-                    RowLayout {
-                        id: windRow
-                        anchors.fill: parent; anchors.margins: fullRoot.cardPad
-                        PlasmaComponents.Label { text: "💨"; font.pixelSize: Kirigami.Units.gridUnit * 1.5 }
-                        ColumnLayout {
-                            spacing: 0
-                            PlasmaComponents.Label { text: "Ветер"; font.pixelSize: Kirigami.Units.gridUnit * 0.72; color: fullRoot.mutedColor }
-                            PlasmaComponents.Label {
-                                text: plasmoidItem
-                                    ? (plasmoidItem._currentWindSpeed + plasmoidItem._windUnitLabel +
-                                       " " + (plasmoidItem._currentWindDir || ""))
-                                    : "--"
-                                font.bold: true
+                    visible: fullRoot.showContent
+                    color: fullRoot.cardColor
+                    radius: Kirigami.Units.gridUnit * 0.75
+                    implicitHeight: metricsGrid.implicitHeight + Kirigami.Units.gridUnit * 1.8
+
+                    GridLayout {
+                        id: metricsGrid
+                        anchors.fill: parent
+                        anchors.margins: Kirigami.Units.gridUnit * 0.9
+                        columns: 3
+                        rowSpacing: Kirigami.Units.gridUnit * 0.7
+                        columnSpacing: Kirigami.Units.gridUnit * 0.7
+
+                        // helper-less 6 metrics:
+                        Repeater {
+                            model: [
+                                { l: "Ветер",     v: plasmoidItem ? (plasmoidItem._currentWindSpeed + plasmoidItem._windUnitLabel + " " + (plasmoidItem._currentWindDir||"")) : "--" },
+                                { l: "Влажность", v: plasmoidItem ? (plasmoidItem._currentHumidity + "%") : "--" },
+                                { l: "Давление",  v: plasmoidItem ? (plasmoidItem._currentPressure + " мм") : "--" },
+                                { l: "Осадки",    v: plasmoidItem ? (plasmoidItem._precipSum + " мм") : "--" },
+                                { l: "УФ-индекс", v: plasmoidItem ? plasmoidItem.uvText(plasmoidItem._uvIndex) : "--" },
+                                { l: "Солнце",    v: fullRoot.sunText() }
+                            ]
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                spacing: 2
+                                PlasmaComponents.Label {
+                                    text: modelData.l
+                                    font.pixelSize: Kirigami.Units.gridUnit * 0.72
+                                    color: fullRoot.subtleColor
+                                }
+                                PlasmaComponents.Label {
+                                    text: modelData.v
+                                    font.pixelSize: Kirigami.Units.gridUnit * 0.92
+                                    font.weight: Font.Medium
+                                    color: fullRoot.textColor
+                                    elide: Text.ElideRight
+                                    Layout.fillWidth: true
+                                }
                             }
                         }
-                        Item { Layout.fillWidth: true }
                     }
                 }
 
-                Rectangle { // Humidity
-                    Layout.fillWidth: true
-                    color: fullRoot.cardColor; radius: fullRoot.cardRadius
-                    implicitHeight: humRow.implicitHeight + Kirigami.Units.largeSpacing
-                    RowLayout {
-                        id: humRow
-                        anchors.fill: parent; anchors.margins: fullRoot.cardPad
-                        PlasmaComponents.Label { text: "💧"; font.pixelSize: Kirigami.Units.gridUnit * 1.5 }
-                        ColumnLayout {
-                            spacing: 0
-                            PlasmaComponents.Label { text: "Влажность"; font.pixelSize: Kirigami.Units.gridUnit * 0.72; color: fullRoot.mutedColor }
-                            PlasmaComponents.Label {
-                                text: plasmoidItem ? (plasmoidItem._currentHumidity + "%") : "--"
-                                font.bold: true
-                            }
-                        }
-                        Item { Layout.fillWidth: true }
-                    }
-                }
-
-                Rectangle { // Pressure
-                    Layout.fillWidth: true
-                    color: fullRoot.cardColor; radius: fullRoot.cardRadius
-                    implicitHeight: presRow.implicitHeight + Kirigami.Units.largeSpacing
-                    RowLayout {
-                        id: presRow
-                        anchors.fill: parent; anchors.margins: fullRoot.cardPad
-                        PlasmaComponents.Label { text: "🧭"; font.pixelSize: Kirigami.Units.gridUnit * 1.5 }
-                        ColumnLayout {
-                            spacing: 0
-                            PlasmaComponents.Label { text: "Давление"; font.pixelSize: Kirigami.Units.gridUnit * 0.72; color: fullRoot.mutedColor }
-                            PlasmaComponents.Label {
-                                text: plasmoidItem ? (plasmoidItem._currentPressure + " мм рт.ст.") : "--"
-                                font.bold: true
-                            }
-                        }
-                        Item { Layout.fillWidth: true }
-                    }
-                }
-
-                Rectangle { // Cloud cover
-                    Layout.fillWidth: true
-                    color: fullRoot.cardColor; radius: fullRoot.cardRadius
-                    implicitHeight: cloudRow.implicitHeight + Kirigami.Units.largeSpacing
-                    RowLayout {
-                        id: cloudRow
-                        anchors.fill: parent; anchors.margins: fullRoot.cardPad
-                        PlasmaComponents.Label { text: "☁️"; font.pixelSize: Kirigami.Units.gridUnit * 1.5 }
-                        ColumnLayout {
-                            spacing: 0
-                            PlasmaComponents.Label { text: "Облачность"; font.pixelSize: Kirigami.Units.gridUnit * 0.72; color: fullRoot.mutedColor }
-                            PlasmaComponents.Label {
-                                text: plasmoidItem
-                                    ? ((plasmoidItem._currentCloudCover != null ? plasmoidItem._currentCloudCover : 0) + "%")
-                                    : "--"
-                                font.bold: true
-                            }
-                        }
-                        Item { Layout.fillWidth: true }
-                    }
-                }
-            }
-
-            // ── Day metrics strip: sunrise / sunset / UV / precip ─────────
-            RowLayout {
-                id: dayStrip
-                Layout.fillWidth: true
-                visible: fullRoot.showContent
-                spacing: Kirigami.Units.smallSpacing
-
-                Rectangle { // Sunrise
-                    Layout.fillWidth: true
-                    color: fullRoot.cardColor; radius: fullRoot.cardRadius
-                    implicitHeight: sunCol.implicitHeight + Kirigami.Units.largeSpacing
-                    ColumnLayout {
-                        id: sunCol
-                        anchors.fill: parent; anchors.margins: fullRoot.cardPad
-                        spacing: 0
-                        PlasmaComponents.Label { Layout.alignment: Qt.AlignHCenter; text: "🌅"; font.pixelSize: Kirigami.Units.gridUnit * 1.4 }
-                        PlasmaComponents.Label { Layout.alignment: Qt.AlignHCenter; text: "Восход"; font.pixelSize: Kirigami.Units.gridUnit * 0.65; color: fullRoot.mutedColor }
-                        PlasmaComponents.Label { Layout.alignment: Qt.AlignHCenter; text: plasmoidItem ? plasmoidItem._sunrise : "--:--"; font.bold: true; font.pixelSize: Kirigami.Units.gridUnit * 0.85 }
-                    }
-                }
-                Rectangle { // Sunset
-                    Layout.fillWidth: true
-                    color: fullRoot.cardColor; radius: fullRoot.cardRadius
-                    implicitHeight: setCol.implicitHeight + Kirigami.Units.largeSpacing
-                    ColumnLayout {
-                        id: setCol
-                        anchors.fill: parent; anchors.margins: fullRoot.cardPad
-                        spacing: 0
-                        PlasmaComponents.Label { Layout.alignment: Qt.AlignHCenter; text: "🌇"; font.pixelSize: Kirigami.Units.gridUnit * 1.4 }
-                        PlasmaComponents.Label { Layout.alignment: Qt.AlignHCenter; text: "Закат"; font.pixelSize: Kirigami.Units.gridUnit * 0.65; color: fullRoot.mutedColor }
-                        PlasmaComponents.Label { Layout.alignment: Qt.AlignHCenter; text: plasmoidItem ? plasmoidItem._sunset : "--:--"; font.bold: true; font.pixelSize: Kirigami.Units.gridUnit * 0.85 }
-                    }
-                }
-                Rectangle { // UV index
-                    Layout.fillWidth: true
-                    color: fullRoot.cardColor; radius: fullRoot.cardRadius
-                    implicitHeight: uvCol.implicitHeight + Kirigami.Units.largeSpacing
-                    ColumnLayout {
-                        id: uvCol
-                        anchors.fill: parent; anchors.margins: fullRoot.cardPad
-                        spacing: 0
-                        PlasmaComponents.Label { Layout.alignment: Qt.AlignHCenter; text: "☀️"; font.pixelSize: Kirigami.Units.gridUnit * 1.4 }
-                        PlasmaComponents.Label { Layout.alignment: Qt.AlignHCenter; text: "УФ-индекс"; font.pixelSize: Kirigami.Units.gridUnit * 0.65; color: fullRoot.mutedColor }
-                        PlasmaComponents.Label { Layout.alignment: Qt.AlignHCenter; text: plasmoidItem ? plasmoidItem.uvText(plasmoidItem._uvIndex) : "--"; font.bold: true; font.pixelSize: Kirigami.Units.gridUnit * 0.85 }
-                    }
-                }
-                Rectangle { // Precipitation
-                    Layout.fillWidth: true
-                    color: fullRoot.cardColor; radius: fullRoot.cardRadius
-                    implicitHeight: precCol.implicitHeight + Kirigami.Units.largeSpacing
-                    ColumnLayout {
-                        id: precCol
-                        anchors.fill: parent; anchors.margins: fullRoot.cardPad
-                        spacing: 0
-                        PlasmaComponents.Label { Layout.alignment: Qt.AlignHCenter; text: "🌧️"; font.pixelSize: Kirigami.Units.gridUnit * 1.4 }
-                        PlasmaComponents.Label { Layout.alignment: Qt.AlignHCenter; text: "Осадки"; font.pixelSize: Kirigami.Units.gridUnit * 0.65; color: fullRoot.mutedColor }
-                        PlasmaComponents.Label { Layout.alignment: Qt.AlignHCenter; text: fullRoot.precipText(); font.bold: true; font.pixelSize: Kirigami.Units.gridUnit * 0.85 }
-                    }
-                }
-            }
-
-            // ── "Today" card: holidays + this day in history ──────────────
-            Rectangle {
-                Layout.fillWidth: true
-                color: fullRoot.cardColor
-                radius: fullRoot.cardRadius
-                implicitHeight: todayCol.implicitHeight + Kirigami.Units.largeSpacing * 1.4
-                // hide entirely if nothing to show
-                visible: fullRoot.showContent &&
-                         (((plasmoidItem && plasmoidItem._holidaysText.length > 0)) ||
-                          ((plasmoidItem && plasmoidItem._historyEvents.length > 0)))
-
+                // ── Hourly forecast ─────────────────────────────────────────
                 ColumnLayout {
-                    id: todayCol
-                    anchors.fill: parent
-                    anchors.margins: fullRoot.hPad * 0.8
-                    spacing: Kirigami.Units.smallSpacing
+                    Layout.fillWidth: true
+                    visible: fullRoot.showContent && fullRoot.showHourly()
+                             && plasmoidItem && plasmoidItem._hourlyForecasts.length > 0
+                    spacing: Kirigami.Units.gridUnit * 0.6
 
                     PlasmaComponents.Label {
-                        text: "📅 Сегодня"
-                        font.bold: true
-                        font.pixelSize: Kirigami.Units.gridUnit * 0.95
+                        text: "Почасовой прогноз"
+                        font.pixelSize: Kirigami.Units.gridUnit * 0.85
+                        color: fullRoot.subtleColor
+                    }
+                    ListView {
+                        id: hourlyList
+                        Layout.fillWidth: true
+                        orientation: ListView.Horizontal
+                        spacing: Kirigami.Units.gridUnit
+                        implicitHeight: Kirigami.Units.gridUnit * 5.6
+                        clip: true
+
+                        interactive: contentWidth > width
+                        boundsBehavior: Flickable.StopAtBounds
+
+                        model: plasmoidItem ? plasmoidItem._hourlyForecasts : []
+                        delegate: ForecastItem {
+                            width: Kirigami.Units.gridUnit * 3.4
+                            height: hourlyList.height
+                            forecastData: modelData
+                            appletRef: plasmoidItem
+                            isFirst: index === 0
+                        }
+                    }
+                }
+
+                // ── Divider ─────────────────────────────────────────────────
+                Rectangle {
+                    Layout.fillWidth: true
+                    visible: fullRoot.showContent && fullRoot.showDaily()
+                             && plasmoidItem && plasmoidItem._forecasts.length > 1
+                    height: 1
+                    color: fullRoot.dividerColor
+                }
+
+                // ── Daily forecast (vertical rows + temp bars) ──────────────
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    visible: fullRoot.showContent && fullRoot.showDaily()
+                             && plasmoidItem && plasmoidItem._forecasts.length > 0
+                    spacing: Kirigami.Units.gridUnit * 0.55
+
+                    PlasmaComponents.Label {
+                        text: "Прогноз по дням"
+                        font.pixelSize: Kirigami.Units.gridUnit * 0.85
+                        color: fullRoot.subtleColor
                     }
 
+                    Repeater {
+                        model: plasmoidItem ? plasmoidItem._forecasts : []
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: Kirigami.Units.gridUnit * 0.8
+
+                            PlasmaComponents.Label {
+                                Layout.preferredWidth: Kirigami.Units.gridUnit * 4
+                                text: fullRoot.dayLabel(modelData.date, index)
+                                color: fullRoot.textColor
+                                font.pixelSize: Kirigami.Units.gridUnit * 0.92
+                            }
+                            PlasmaComponents.Label {
+                                Layout.preferredWidth: Kirigami.Units.gridUnit * 1.8
+                                text: modelData.emoji
+                                font.pixelSize: Kirigami.Units.gridUnit * 1.35
+                                horizontalAlignment: Text.AlignHCenter
+                            }
+                            // temp bar
+                            Item {
+                                Layout.fillWidth: true
+                                Layout.alignment: Qt.AlignVCenter
+                                implicitHeight: 6
+                                Rectangle {
+                                    anchors.fill: parent
+                                    color: Qt.rgba(1, 1, 1, 0.1)
+                                    radius: 3
+                                }
+                                Rectangle {
+                                    property real rng: Math.max(1, fullRoot.weekMax - fullRoot.weekMin)
+                                    x: parent.width * Math.max(0, (modelData.temp_min - fullRoot.weekMin) / rng)
+                                    width: parent.width * Math.max(0.03, (modelData.temp_max - modelData.temp_min) / rng)
+                                    height: parent.height
+                                    radius: 3
+                                    gradient: Gradient {
+                                        orientation: Gradient.Horizontal
+                                        GradientStop { position: 0.0; color: fullRoot.barCold }
+                                        GradientStop { position: 1.0; color: fullRoot.barWarm }
+                                    }
+                                }
+                            }
+                            PlasmaComponents.Label {
+                                Layout.preferredWidth: Kirigami.Units.gridUnit * 2.3
+                                text: (modelData.temp_min || 0) + "°"
+                                color: fullRoot.subtleColor
+                                font.pixelSize: Kirigami.Units.gridUnit * 0.92
+                                horizontalAlignment: Text.AlignRight
+                            }
+                            PlasmaComponents.Label {
+                                Layout.preferredWidth: Kirigami.Units.gridUnit * 2.3
+                                text: (modelData.temp_max || 0) + "°"
+                                color: fullRoot.textColor
+                                font.pixelSize: Kirigami.Units.gridUnit * 0.92
+                                font.weight: Font.DemiBold
+                                horizontalAlignment: Text.AlignRight
+                            }
+                        }
+                    }
+                }
+
+                // ── Optional "Сегодня" (holidays + this day in history) ─────
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    visible: fullRoot.showContent && plasmoidItem &&
+                             (plasmoidItem._holidaysText.length > 0 || plasmoidItem._historyEvents.length > 0)
+                    spacing: Kirigami.Units.gridUnit * 0.4
+
+                    Rectangle { Layout.fillWidth: true; height: 1; color: fullRoot.dividerColor }
+
                     PlasmaComponents.Label {
-                        Layout.fillWidth: true
-                        visible: plasmoidItem && plasmoidItem._holidaysText.length > 0
                         text: plasmoidItem ? plasmoidItem._holidaysText : ""
-                        font.pixelSize: Kirigami.Units.gridUnit * 0.9
-                        font.bold: true
+                        visible: plasmoidItem && plasmoidItem._holidaysText.length > 0
+                        font.pixelSize: Kirigami.Units.gridUnit * 0.88
+                        font.weight: Font.Medium
                         color: fullRoot.accentColor
                         wrapMode: Text.WordWrap
+                        Layout.fillWidth: true
                     }
-
                     Repeater {
                         model: plasmoidItem ? plasmoidItem._historyEvents : []
                         PlasmaComponents.Label {
                             Layout.fillWidth: true
                             text: "📜 " + (modelData.year || "?") + ": " + (modelData.text || "")
                             font.pixelSize: Kirigami.Units.gridUnit * 0.78
-                            color: fullRoot.mutedColor
+                            color: fullRoot.subtleColor
                             wrapMode: Text.WordWrap
                             elide: Text.ElideRight
-                            maximumLineCount: 3
+                            maximumLineCount: 2
                         }
-                    }
-
-                    PlasmaComponents.Label {
-                        visible: plasmoidItem && plasmoidItem._historyEvents.length === 0
-                                 && plasmoidItem._holidaysText.length === 0
-                        text: "Загружаем события дня…"
-                        font.pixelSize: Kirigami.Units.gridUnit * 0.75
-                        color: fullRoot.mutedColor
-                        font.italic: true
                     }
                 }
             }
-
-            // ── Forecast ──────────────────────────────────────────────────
-            ColumnLayout {
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-                Layout.minimumHeight: Kirigami.Units.gridUnit * 10
-                visible: fullRoot.showContent && plasmoid.configuration.showForecast
-                spacing: Kirigami.Units.smallSpacing
-
-                RowLayout {
-                    Layout.fillWidth: true
-                    PlasmaComponents.Label {
-                        text: fullRoot.forecastMode() === "hourly" ? "⏱️ Почасовой прогноз"
-                              : fullRoot.forecastMode() === "both" ? "🔮 Прогноз"
-                              : "📅 Прогноз по дням"
-                        font.bold: true
-                        font.pixelSize: Kirigami.Units.gridUnit
-                    }
-                    Item { Layout.fillWidth: true }
-                    RowLayout {
-                        visible: fullRoot.forecastMode() === "both"
-                        spacing: 0
-                        PlasmaComponents.ToolButton {
-                            text: "Дни"; checkable: true; checked: fullRoot.forecastTab === 0
-                            onClicked: fullRoot.forecastTab = 0
-                        }
-                        PlasmaComponents.ToolButton {
-                            text: "Часы"; checkable: true; checked: fullRoot.forecastTab === 1
-                            onClicked: fullRoot.forecastTab = 1
-                        }
-                    }
-                }
-
-                ListView {
-                    id: dailyList
-                    Layout.fillWidth: true
-                    Layout.fillHeight: true
-                    orientation: ListView.Horizontal
-                    spacing: Kirigami.Units.smallSpacing
-                    clip: true
-                    visible: fullRoot.showDaily() &&
-                             (fullRoot.forecastMode() !== "both" || fullRoot.forecastTab === 0)
-                    model: plasmoidItem ? plasmoidItem._forecasts : []
-                    delegate: ForecastItem {
-                        width: Kirigami.Units.gridUnit * 6.2
-                        height: dailyList.height
-                        mode: "daily"
-                        forecastData: modelData
-                        appletRef: plasmoidItem
-                    }
-                }
-
-                ListView {
-                    id: hourlyList
-                    Layout.fillWidth: true
-                    Layout.fillHeight: true
-                    orientation: ListView.Horizontal
-                    spacing: Kirigami.Units.smallSpacing
-                    clip: true
-                    visible: fullRoot.showHourly() &&
-                             plasmoidItem && plasmoidItem._hourlyForecasts.length > 0 &&
-                             (fullRoot.forecastMode() !== "both" || fullRoot.forecastTab === 1)
-                    model: plasmoidItem ? plasmoidItem._hourlyForecasts : []
-                    delegate: ForecastItem {
-                        width: Kirigami.Units.gridUnit * 5.2
-                        height: hourlyList.height
-                        mode: "hourly"
-                        forecastData: modelData
-                        appletRef: plasmoidItem
-                    }
-                }
-            }
-        } // mainColumn
-    } // Flickable
+        }
+    }
 }

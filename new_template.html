@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KDE Weather Widget</title>
+    <style>
+        :root {
+            --bg-color: rgba(30, 30, 40, 0.85);
+            --card-bg: rgba(255, 255, 255, 0.05);
+            --text-color: #ffffff;
+            --subtle-text: rgba(255, 255, 255, 0.6);
+            --accent-color: #3daee9;
+            --divider-color: rgba(255, 255, 255, 0.1);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Segoe UI', Roboto, 'Noto Sans', sans-serif;
+            background: url('https://images.unsplash.com/photo-1419242902214-272b3f66ee7a?q=80&w=2103&auto=format&fit=crop') center/cover no-repeat fixed; /* Просто фон для демонстрации */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            color: var(--text-color);
+        }
+
+        /* Основной контейнер */
+        .widget {
+            width: 420px;
+            background: var(--bg-color);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* 1. Шапка */
+        .current-weather {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .location {
+            font-size: 18px;
+            font-weight: 500;
+        }
+
+        .main-block {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .temp-icon {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .current-icon {
+            font-size: 72px;
+            line-height: 1;
+        }
+
+        .current-temp {
+            font-size: 56px;
+            font-weight: 300;
+        }
+
+        .feels-like {
+            font-size: 14px;
+            color: var(--subtle-text);
+            text-align: right;
+        }
+
+        .description {
+            font-size: 15px;
+            color: var(--subtle-text);
+            font-style: italic;
+        }
+
+        /* 2. Сетка метрик */
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            background: var(--card-bg);
+            padding: 15px;
+            border-radius: 12px;
+        }
+
+        .metric {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .metric-label {
+            font-size: 12px;
+            color: var(--subtle-text);
+            text-transform: capitalize;
+        }
+
+        .metric-value {
+            font-size: 15px;
+            font-weight: 500;
+        }
+
+        /* 3. Почасовой прогноз */
+        .section-title {
+            font-size: 14px;
+            color: var(--subtle-text);
+            margin-bottom: 10px;
+        }
+
+        .hourly-forecast {
+            display: flex;
+            gap: 15px;
+            overflow-x: auto;
+            padding-bottom: 5px;
+            scrollbar-width: thin;
+            scrollbar-color: var(--accent-color) transparent;
+        }
+
+        .hourly-forecast::-webkit-scrollbar { height: 6px; }
+        .hourly-forecast::-webkit-scrollbar-track { background: transparent; }
+        .hourly-forecast::-webkit-scrollbar-thumb { background-color: rgba(255, 255, 255, 0.2); border-radius: 3px; }
+
+        .hourly-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            min-width: 45px;
+        }
+
+        .hourly-time { font-size: 12px; color: var(--subtle-text); }
+        .hourly-icon { font-size: 22px; }
+        .hourly-temp { font-size: 15px; font-weight: 500; }
+
+        .divider {
+            height: 1px;
+            background: var(--divider-color);
+            margin: 4px 0;
+        }
+
+        /* 4. Прогноз на 7 дней */
+        .daily-forecast {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .daily-item {
+            display: grid;
+            grid-template-columns: 70px 30px 1fr 40px 40px;
+            align-items: center;
+            gap: 15px;
+            font-size: 15px;
+        }
+
+        .day-name { color: var(--text-color); }
+        .daily-icon { font-size: 22px; text-align: center; }
+        
+        .temp-bar-container {
+            position: relative;
+            height: 6px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .temp-bar {
+            position: absolute;
+            height: 100%;
+            background: linear-gradient(90deg, #4fc3f7, #ffb74d);
+            border-radius: 3px;
+        }
+
+        .daily-min-temp { text-align: right; color: var(--subtle-text); }
+        .daily-max-temp { text-align: right; font-weight: 600; }
+
+    </style>
+</head>
+<body>
+
+    <div class="widget">
+        <!-- Шапка -->
+        <div class="current-weather">
+            <div class="location">Калининград</div>
+            <div class="main-block">
+                <div class="temp-icon">
+                    <div class="current-icon">☁️</div>
+                    <div class="current-temp">20°</div>
+                </div>
+                <div class="feels-like">Ощущается как<br>20°</div>
+            </div>
+            <div class="description">Так хорошо, что даже подозрительно.</div>
+        </div>
+
+        <!-- Метрики -->
+        <div class="metrics-grid">
+            <div class="metric">
+                <div class="metric-label">Ветер</div>
+                <div class="metric-value">2.5 м/с</div>
+            </div>
+            <div class="metric">
+                <div class="metric-label">Влажность</div>
+                <div class="metric-value">65%</div>
+            </div>
+            <div class="metric">
+                <div class="metric-label">Давление</div>
+                <div class="metric-value">753 мм</div>
+            </div>
+            <div class="metric">
+                <div class="metric-label">Осадки</div>
+                <div class="metric-value">0 мм</div>
+            </div>
+            <div class="metric">
+                <div class="metric-label">УФ-индекс</div>
+                <div class="metric-value">6 · высокий</div>
+            </div>
+            <div class="metric">
+                <div class="metric-label">Солнце</div>
+                <div class="metric-value">04:38 - 20:50</div>
+            </div>
+        </div>
+
+        <!-- Почасовой прогноз -->
+        <div>
+            <div class="section-title">Почасовой прогноз</div>
+            <div class="hourly-forecast" id="hourly-container"></div>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- Прогноз на 7 дней -->
+        <div>
+            <div class="section-title">Прогноз на 7 дней</div>
+            <div class="daily-forecast" id="daily-container"></div>
+        </div>
+    </div>
+
+    <script>
+        const icons = ["☀️", "⛅", "☁️", "🌧️", "⛈️"];
+        const daysRu = ["Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб"];
+        const now = new Date();
+
+        // Генерация почасового прогноза (24 часа)
+        const hourlyContainer = document.getElementById('hourly-container');
+        for (let i = 0; i < 24; i++) {
+            let futureDate = new Date(now.getTime() + i * 3600000);
+            let hour = futureDate.getHours();
+            let timeStr = i === 0 ? "Сейчас" : (hour < 10 ? "0" + hour : hour) + ":00";
+            let temp = Math.round(18 + Math.random() * 4 - i * 0.1);
+            let icon = icons[Math.floor(Math.random() * icons.length)];
+
+            hourlyContainer.innerHTML += `
+                <div class="hourly-item">
+                    <div class="hourly-time">${timeStr}</div>
+                    <div class="hourly-icon">${icon}</div>
+                    <div class="hourly-temp">${temp}°</div>
+                </div>
+            `;
+        }
+
+        // Генерация прогноза на 7 дней
+        const dailyContainer = document.getElementById('daily-container');
+        // Для красоты температурной полоски зададим глобальный минимум и максимум недели
+        let globalMin = 15;
+        let globalMax = 28;
+
+        for (let i = 0; i < 7; i++) {
+            let futureDate = new Date(now.getTime() + i * 86400000);
+            let dayName = i === 0 ? "Сегодня" : daysRu[futureDate.getDay()];
+            
+            // Делаем понедельник более жарким, как на скриншоте
+            let minTemp = i === 1 ? 20 : Math.round(15 + Math.random() * 5);
+            let maxTemp = i === 1 ? 26 : minTemp + Math.round(4 + Math.random() * 5);
+            
+            if (minTemp < globalMin) globalMin = minTemp;
+            if (maxTemp > globalMax) globalMax = maxTemp;
+
+            let icon = icons[Math.floor(Math.random() * icons.length)];
+
+            // Вычисляем позицию и ширину полоски температуры в процентах
+            let range = globalMax - globalMin;
+            let barStart = ((minTemp - globalMin) / range) * 100;
+            let barWidth = ((maxTemp - minTemp) / range) * 100;
+
+            dailyContainer.innerHTML += `
+                <div class="daily-item">
+                    <div class="day-name">${dayName}</div>
+                    <div class="daily-icon">${icon}</div>
+                    <div class="temp-bar-container">
+                        <div class="temp-bar" style="left: ${barStart}%; width: ${barWidth}%;"></div>
+                    </div>
+                    <div class="daily-min-temp">${minTemp}°</div>
+                    <div class="daily-max-temp">${maxTemp}°</div>
+                </div>
+            `;
+        }
+    </script>
+</body>
+</html>
