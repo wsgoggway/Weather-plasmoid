@@ -35,8 +35,5 @@
         <entry name="forecastMode" type="String">
             <default>daily</default>
         </entry>
-        <entry name="showToday" type="Bool">
-            <default>true</default>
-        </entry>
     </group>
 </kcfg>

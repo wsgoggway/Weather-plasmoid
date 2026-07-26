@@ -10,7 +10,7 @@ All identifiers/code are in English; descriptions are now in English as well.
 - A **Plasma 6 plasmoid (applet)** using `KPackageStructure: Plasma/Applet`.
 - Id: `com.github.vladimirm.openmeteo-weather`.
 - **No C++/Python/compilation.** Only QML + JavaScript + JSON metadata.
-- Weather source: **Open-Meteo** (no key). City geocoding — Open-Meteo Geocoding, IP geolocation — ip-api/ipwhois, "this day in history" — Wikipedia REST API (ru).
+- Weather source: **Open-Meteo** (no key). City geocoding — Open-Meteo Geocoding, IP geolocation — ip-api/ipwhois.
 
 ---
 
@@ -81,8 +81,6 @@ In `configGeneral.qml`:
   - `api.open-meteo.com/v1/forecast` — weather
   - `geocoding-api.open-meteo.com/v1/search` — city → coordinates
   - `ip-api.com/json/` (http) + `ipwhois.app/json/` (fallback) — IP geolocation
-  - `ru.wikipedia.org/api/rest_v1/feed/onthisday/events/MM/DD` — historical events (ru)
-  - `htmlweb.ru/json/calendar/list` — holidays (keyless, but **~20 req/day/IP**; fetch **once per day** via `_holidaysDate` cache; fall back to the offline dictionary on error/limit)
 - Before using a new API field, **verify the exact name and format with `curl`** (e.g., `uv_index_max`, `precipitation_sum`).
 
 ---
@@ -160,7 +158,6 @@ Design reference: `new_template.html` (dark glassmorphism). The full layout live
 | Error messages | `i18n("Network error")`, `i18n("HTTP error %1").arg(status)` |
 | Feels-like jokes | `i18n("Put on a hat. Mom is watching, implicitly.")` |
 | Settings labels | `i18n("Update interval (min):")` |
-| Holiday names | `i18n("New Year")`, `i18nc("holiday", "Christmas")` |
 | Forecast labels | `i18n("Daily")`, `i18n("Hourly")`, `i18n("Now")` |
 
 ### Parameters
