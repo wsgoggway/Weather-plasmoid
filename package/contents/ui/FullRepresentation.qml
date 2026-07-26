@@ -400,7 +400,9 @@ Item {
             // ── Optional "Сегодня" (holidays + this day in history) ─────
             ColumnLayout {
                 Layout.fillWidth: true
-                visible: fullRoot.showContent && plasmoidItem &&
+                visible: fullRoot.showContent &&
+                         (plasmoid.configuration.showToday !== false) &&
+                         plasmoidItem &&
                          (plasmoidItem._holidaysText.length > 0 || plasmoidItem._historyEvents.length > 0)
                 spacing: Kirigami.Units.smallSpacing
 

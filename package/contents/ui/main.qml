@@ -72,11 +72,33 @@ PlasmoidItem {
             _updateTimer.interval = Math.max((plasmoid.configuration.updateInterval || 30) * 60 * 1000, 60000)
             _updateTimer.restart()
         }
+        // Re-render on any weather-affecting setting change (debounced).
+        function onLatitudeChanged()      { _configReloadTimer.restart() }
+        function onLongitudeChanged()     { _configReloadTimer.restart() }
+        function onTimezoneChanged()      { _configReloadTimer.restart() }
+        function onTemperatureUnitChanged(){ _configReloadTimer.restart() }
+        function onWindSpeedUnitChanged() { _configReloadTimer.restart() }
+        function onForecastDaysChanged()  { _configReloadTimer.restart() }
+        function onForecastModeChanged()  { _configReloadTimer.restart() }
+        function onShowForecastChanged()  { _configReloadTimer.restart() }
+        function onShowTodayChanged()     { _configReloadTimer.restart() }
+    }
+
+    // Coalesces a burst of config changes (one Apply) into a single reload.
+    Timer {
+        id: _configReloadTimer
+        interval: 400
+        repeat: false
+        onTriggered: {
+            fetchWeather()
+            if (plasmoid.configuration.showToday !== false) fetchThisDay()
+        }
     }
 
     Component.onCompleted: {
-        // Fetch today's holidays + "this day in history" once at startup.
-        fetchThisDay()
+        // Fetch today's holidays + "this day in history" once at startup
+        // (only if the "Сегодня" block is enabled).
+        if (plasmoid.configuration.showToday !== false) fetchThisDay()
     }
 
     // ── Geocode city name → coordinates ─────────────────────────────────────
