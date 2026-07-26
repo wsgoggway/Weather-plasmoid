@@ -72,7 +72,7 @@ PlasmoidItem {
             _updateTimer.interval = Math.max((plasmoid.configuration.updateInterval || 30) * 60 * 1000, 60000)
             _updateTimer.restart()
         }
-        // Re-render on any weather-affecting setting change (debounced).
+        // Re-render on weather-affecting setting change (debounced).
         function onLatitudeChanged()      { _configReloadTimer.restart() }
         function onLongitudeChanged()     { _configReloadTimer.restart() }
         function onTimezoneChanged()      { _configReloadTimer.restart() }
@@ -81,24 +81,31 @@ PlasmoidItem {
         function onForecastDaysChanged()  { _configReloadTimer.restart() }
         function onForecastModeChanged()  { _configReloadTimer.restart() }
         function onShowForecastChanged()  { _configReloadTimer.restart() }
-        function onShowTodayChanged()     { _configReloadTimer.restart() }
+        // "Сегодня" toggle: never hit the API while off; fetch + cache when on.
+        function onShowTodayChanged() {
+            if (plasmoid.configuration.showToday === false) {
+                _holidaysText = ""
+                _historyEvents = []
+                _holidaysDate = ""
+                _historyDate = ""
+            } else {
+                fetchThisDay()
+            }
+        }
     }
 
-    // Coalesces a burst of config changes (one Apply) into a single reload.
+    // Coalesces a burst of config changes (one Apply) into a single weather reload.
     Timer {
         id: _configReloadTimer
         interval: 400
         repeat: false
-        onTriggered: {
-            fetchWeather()
-            if (plasmoid.configuration.showToday !== false) fetchThisDay()
-        }
+        onTriggered: fetchWeather()
     }
 
     Component.onCompleted: {
-        // Fetch today's holidays + "this day in history" once at startup
-        // (only if the "Сегодня" block is enabled).
-        if (plasmoid.configuration.showToday !== false) fetchThisDay()
+        // Fetch today's holidays + "this day in history" once at startup.
+        // fetchThisDay() itself refuses to run if the "Сегодня" block is off.
+        fetchThisDay()
     }
 
     // ── Geocode city name → coordinates ─────────────────────────────────────
@@ -369,6 +376,8 @@ PlasmoidItem {
     // Both are fetched at most once per day (cached by date). On any failure
     // (network, rate-limit) we keep the offline holiday dictionary fallback.
     function fetchThisDay() {
+        // Hard guard: never hit the network while the "Сегодня" block is disabled.
+        if (plasmoid.configuration.showToday === false) return
         var now = new Date()
         var mm = now.getMonth() + 1
         var dd = now.getDate()
