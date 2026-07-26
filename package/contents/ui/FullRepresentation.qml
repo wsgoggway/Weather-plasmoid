@@ -12,7 +12,7 @@ import org.kde.kirigami 2.20 as Kirigami
  * is set on the root so all Plasma controls render light-on-dark.
  * Sections: location header (big thin temp + feels-like right + italic quip),
  * 3×2 metrics grid, hourly forecast (horizontal), divider, daily forecast
- * (vertical rows with gradient temp-bars), and an optional "Сегодня" block.
+ * (vertical rows with gradient temp-bars).
  */
 Item {
     id: fullRoot
@@ -397,54 +397,6 @@ Item {
                             font.pixelSize: Kirigami.Units.gridUnit * 0.92
                             font.weight: Font.DemiBold
                             horizontalAlignment: Text.AlignRight
-                        }
-                    }
-                }
-            }
-
-            // ── Optional "Сегодня" (holidays + this day in history) ─────
-            ColumnLayout {
-                Layout.fillWidth: true
-                visible: fullRoot.showContent &&
-                         (plasmoid.configuration.showToday !== false) &&
-                         plasmoidItem &&
-                         (plasmoidItem._holidaysText.length > 0 || plasmoidItem._historyEvents.length > 0)
-                spacing: Kirigami.Units.smallSpacing
-
-                Rectangle { Layout.fillWidth: true; height: 1; color: fullRoot.dividerColor }
-
-                PlasmaComponents.Label {
-                    text: "Сегодня"
-                    font.pixelSize: Kirigami.Units.gridUnit * 0.85
-                    color: fullRoot.subtleColor
-                }
-                PlasmaComponents.Label {
-                    text: plasmoidItem ? plasmoidItem._holidaysText : ""
-                    visible: plasmoidItem && plasmoidItem._holidaysText.length > 0
-                    font.pixelSize: Kirigami.Units.gridUnit * 0.9
-                    font.weight: Font.Medium
-                    color: fullRoot.accentColor
-                    wrapMode: Text.WordWrap
-                    Layout.fillWidth: true
-                }
-                Repeater {
-                    model: plasmoidItem ? plasmoidItem._historyEvents : []
-                    PlasmaComponents.Label {
-                        Layout.fillWidth: true
-                        property string _url: modelData.url || ""
-                        text: "📜 " + (modelData.year || "?") + ": " + (modelData.text || "")
-                              + (_url.length ? "  ↗" : "")
-                        font.pixelSize: Kirigami.Units.gridUnit * 0.78
-                        color: histMa.containsMouse ? fullRoot.accentColor : fullRoot.subtleColor
-                        wrapMode: Text.WordWrap
-                        elide: Text.ElideRight
-                        maximumLineCount: 2
-                        MouseArea {
-                            id: histMa
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: parent._url.length ? Qt.PointingHandCursor : Qt.ArrowCursor
-                            onClicked: if (parent._url.length) Qt.openUrlExternally(parent._url)
                         }
                     }
                 }
