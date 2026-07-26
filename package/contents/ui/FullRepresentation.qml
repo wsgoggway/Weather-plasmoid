@@ -22,10 +22,12 @@ Item {
     Layout.minimumWidth: Kirigami.Units.gridUnit * 20
     Layout.minimumHeight: Kirigami.Units.gridUnit * 16
     Layout.preferredWidth: Kirigami.Units.gridUnit * 25
-    // Auto-height: the popup grows to fit its content. Plasma clamps it to the
-    // screen; the Flickable only scrolls when content exceeds that (and then
-    // contentHeight reaches the very last day). Floor = minimumHeight.
-    Layout.preferredHeight: contentCol.implicitHeight + fullRoot.pad * 2
+    // Plasma 6 caches the popup size after first open and does not reliably
+    // re-size to dynamic content, so request a tall popup — Plasma clamps it
+    // to the available screen height. Typical content (7-day forecast) then
+    // fits with little/no scroll; the Flickable handles overflow and reaches
+    // the last day. (User can also resize manually; Plasma persists it.)
+    Layout.preferredHeight: Kirigami.Units.gridUnit * 60
 
     property bool showLoading: !plasmoidItem || plasmoidItem._loading
     property bool showError: plasmoidItem ? plasmoidItem._errorMessage.length > 0 : false
@@ -257,12 +259,12 @@ Item {
 
                     Repeater {
                         model: [
-                            { l: "Ветер",     v: plasmoidItem ? (plasmoidItem._currentWindSpeed + plasmoidItem._windUnitLabel + " " + (plasmoidItem._currentWindDir||"")) : "--" },
-                            { l: "Влажность", v: plasmoidItem ? (plasmoidItem._currentHumidity + "%") : "--" },
-                            { l: "Давление",  v: plasmoidItem ? (plasmoidItem._currentPressure + " мм") : "--" },
-                            { l: "Осадки",    v: plasmoidItem ? (plasmoidItem._precipSum + " мм") : "--" },
-                            { l: "УФ-индекс", v: plasmoidItem ? plasmoidItem.uvText(plasmoidItem._uvIndex) : "--" },
-                            { l: "Солнце",    v: fullRoot.sunText() }
+                            { l: "💨 Ветер",     v: plasmoidItem ? (plasmoidItem._currentWindSpeed + plasmoidItem._windUnitLabel + " " + (plasmoidItem._currentWindDir||"")) : "--" },
+                            { l: "💧 Влажность", v: plasmoidItem ? (plasmoidItem._currentHumidity + "%") : "--" },
+                            { l: "🧭 Давление",  v: plasmoidItem ? (plasmoidItem._currentPressure + " мм") : "--" },
+                            { l: "🌧 Осадки",    v: plasmoidItem ? (plasmoidItem._precipSum + " мм") : "--" },
+                            { l: "☀️ УФ-индекс", v: plasmoidItem ? plasmoidItem.uvText(plasmoidItem._uvIndex) : "--" },
+                            { l: "🌅 Солнце",    v: fullRoot.sunText() }
                         ]
                         ColumnLayout {
                             Layout.fillWidth: true
