@@ -95,21 +95,22 @@ In `configGeneral.qml`:
 
 ---
 
-## 6. UI / вёрстка
+## 6. UI / Layout
 
-Эталон дизайна — `new_template.html` (тёмный glassmorphism). Полная раскладка в `FullRepresentation.qml`.
+Design reference: `new_template.html` (dark glassmorphism). The full layout lives in `FullRepresentation.qml`.
 
-- **Стеклянная карточка** — корневой контейнер: `Rectangle { color: Qt.rgba(30/255,30/255,40/255,0.85); radius: gridUnit*1.1; border.color: Qt.rgba(1,1,1,0.1) }`, контент в `Flickable` (`boundsBehavior: StopAtBounds`).
-- **Палитра** (константы на `fullRoot`): `textColor #ffffff`, `subtleColor rgba(1,1,1,0.6)`, `cardColor rgba(1,1,1,0.05)`, `dividerColor rgba(1,1,1,0.1)`, `accentColor #3daee9`, `barCold #4fc3f7`, `barWarm #ffb74d`, `negColor #ef4f4f`.
-- Чтобы Plasma-контролы рендерились светло-на-тёмном, на карточке выставлять `Kirigami.Theme.textColor/disabledTextColor/backgroundColor/highlightColor`.
-- **Шапка**: локация → ряд [эмодзи + крупная тонкая температура (`Font.Light`) | «Ощущается как» справа] → шутка курсивом (`subtleColor`).
-- **Сетка метрик 3×2**: Ветер, Влажность, Давление, Осадки, УФ-индекс, Солнце (восход – закат). **Без иконок** — только label (`subtleColor`) + value (`textColor`, `Font.Medium`). Реализуется `Repeater` внутри `GridLayout`.
-- **Почасовой прогноз** — горизонтальный `ListView`, элементы `ForecastItem` (plain, без фона), первый — «Сейчас».
-- **Прогноз по дням** — вертикальный список (`Repeater` в `ColumnLayout`, **не** вложенный ListView), строка: день / эмодзи / temp-bar / min / max.
-- **temp-bar**: трек `rgba(1,1,1,0.1)` высотой 6px + полоска `Gradient.Horizontal #4fc3f7→#ffb74d`; позиция/ширина — доли от `(t_min−weekMin)/(weekMax−weekMin)`, `weekMin/weekMax` считаются по всем дням прогноза.
-- `ForecastItem` — только почасовой (plain, без карточного фона).
-- Размеры — через `Kirigami.Units.gridUnit`, отступы — `largeSpacing`/`smallSpacing`.
-- Импорты (эталонный набор):
+- **Glass card** — root container: `Rectangle { color: Qt.rgba(30/255,30/255,40/255,0.85); radius: gridUnit*1.1; border.color: Qt.rgba(1,1,1,0.1) }`, content inside a `Flickable` (`boundsBehavior: StopAtBounds`).
+- **Palette** (constants on `fullRoot`): `textColor #ffffff`, `subtleColor rgba(1,1,1,0.6)`, `cardColor rgba(1,1,1,0.05)`, `dividerColor rgba(1,1,1,0.1)`, `accentColor #3daee9`, `barCold #4fc3f7`, `barWarm #ffb74d`, `negColor #ef4f4f`.
+- To render Plasma controls light-on-dark, set `Kirigami.Theme.textColor/disabledTextColor/backgroundColor/highlightColor` on the card.
+- **Header**: location → row [emoji + large thin temperature (`Font.Light`) | "Feels like" on the right] → the joke in italics (`subtleColor`).
+- **Metrics grid 3×2**: Wind, Humidity, Pressure, Precipitation, UV index, Sun (sunrise – sunset). **No icons** — only a label (`subtleColor`) + value (`textColor`, `Font.Medium`). Implemented with a `Repeater` inside a `GridLayout`.
+- **Hourly forecast** — horizontal `ListView`; items are `ForecastItem` (plain, no background); the first item shows "Now".
+- **Daily forecast** — vertical list (`Repeater` inside a `ColumnLayout`, **not** a nested ListView); each row: day / emoji / temp-bar / min / max.
+- **temp-bar**: a `rgba(1,1,1,0.1)` track 6px tall + a `Gradient.Horizontal #4fc3f7→#ffb74d` fill; its position/width are fractions of `(t_min−weekMin)/(weekMax−weekMin)`, where `weekMin`/`weekMax` are computed across all forecast days.
+- `ForecastItem` is hourly-only (plain, no card background).
+- Sizing via `Kirigami.Units.gridUnit`; spacing via `largeSpacing`/`smallSpacing`.
+- All user-visible label/value strings use `i18n()` (see §8).
+- Imports (canonical set):
   ```
   import QtQuick 2.15
   import QtQuick.Layouts 1.15
@@ -118,7 +119,7 @@ In `configGeneral.qml`:
   import org.kde.plasma.plasmoid 2.0
   import org.kde.kirigami 2.20 as Kirigami
   ```
-- У `ToolButton` без текста **не** ставить `display:`.
+- Do **not** set `display:` on a textless `ToolButton`.
 
 ---
 
