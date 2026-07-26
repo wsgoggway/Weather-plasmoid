@@ -1,102 +1,113 @@
-# AGENT.md — правила для агента (Open-Meteo Weather Plasmoid)
+# AGENT.md — Rules for the Agent (Open-Meteo Weather Plasmoid)
 
-Виджет погоды для **KDE Plasma 6** на чистом QML/JS. Бесплатные API без ключей.
-Все пояснения ниже — на русском (язык проекта), идентификаторы/код — на английском.
+Weather widget for **KDE Plasma 6** in pure QML/JS. Free APIs, no API keys required.
+All identifiers/code are in English; descriptions are now in English as well.
 
 ---
 
-## 0. Что это
+## 0. What Is This
 
-- **Плазмоид (applet) Plasma 6**, структура пакета `KPackageStructure: Plasma/Applet`.
+- A **Plasma 6 plasmoid (applet)** using `KPackageStructure: Plasma/Applet`.
 - Id: `com.github.vladimirm.openmeteo-weather`.
-- **Без C++/Python/компиляции.** Только QML + JavaScript + JSON-метаданные.
-- Источник погоды — **Open-Meteo** (без ключа). Геолокация по городу — Open-Meteo Geocoding, по IP — ip-api/ipwhois, «этот день в истории» — Wikipedia REST (ru).
+- **No C++/Python/compilation.** Only QML + JavaScript + JSON metadata.
+- Weather source: **Open-Meteo** (no key). City geocoding — Open-Meteo Geocoding, IP geolocation — ip-api/ipwhois, "this day in history" — Wikipedia REST API (ru).
 
 ---
 
-## 1. Структура
+## 1. Structure
 
 ```
 package/
-├── metadata.json                 # метаданные Plasma 6 (Id, Version, KPlugin)
+├── metadata.json                 # Plasma 6 metadata (Id, Version, KPlugin)
 └── contents/
     ├── ui/
-    │   ├── main.qml              # корень (PlasmoidItem): состояние, сеть, парсинг
-    │   ├── CompactRepresentation.qml   # вид в панели (emoji + temp)
-    │   ├── FullRepresentation.qml      # развёрнутый popup (карточная вёрстка)
-    │   ├── ForecastItem.qml       # карточка прогноза (daily/hourly)
-    │   ├── DetailRow.qml          # строка детализации (icon + label + value)
-    │   └── configGeneral.qml      # страница настроек (KCM.SimpleKCM)
-    └── config/
-        ├── config.qml            # ConfigModel → одна категория «Основные»
-        └── main.xml              # схема KConfig XT (типы + дефолты)
-install.sh                        # копирует package/ в plasma/plasmoids/<Id>
+    │   ├── main.qml              # root (PlasmoidItem): state, network, parsing
+    │   ├── CompactRepresentation.qml   # panel view (emoji + temp)
+    │   ├── FullRepresentation.qml      # expanded popup (card layout)
+    │   ├── ForecastItem.qml       # forecast card (daily/hourly)
+    │   ├── DetailRow.qml          # detail row (icon + label + value)
+    │   └── configGeneral.qml      # settings page (KCM.SimpleKCM)
+    ├── config/
+    │   ├── config.qml            # ConfigModel → one category "General"
+    │   └── main.xml              # KConfig XT schema (types + defaults)
+    └── locale/                   # i18n: .po files, one per language
+        └── ru/
+            └── LC_MESSAGES/
+                └── plasmoid_com.github.vladimirm.openmeteo-weather.po
+install.sh                        # copies package/ into plasma/plasmoids/<Id>
 ```
 
-- `main.qml` (`PlasmoidItem { id: root }`) — **единственный источник истины** для состояния и логики.
-- `FullRepresentation` / `CompactRepresentation` получают `plasmoidItem: root` автоматически; читают `plasmoidItem._*` свойства. Логики сети/парсинга в них быть не должно.
+- `main.qml` (`PlasmoidItem { id: root }`) — **the single source of truth** for state and logic.
+- `FullRepresentation` / `CompactRepresentation` receive `plasmoidItem: root` automatically; they read `plasmoidItem._*` properties. They must not contain network or parsing logic.
 
 ---
 
-## 2. ⚠️ Главное правило: настройки (Plasma 6 KCM)
+## 2. ⚠️ Golden Rule: Settings (Plasma 6 KCM)
 
-Баг, который уже был и не должен вернуться: **`onValueChanged`/`onCheckedChanged` перетирают загруженные значения при инициализации.**
+A bug that has happened before and must not recur: **`onValueChanged`/`onCheckedChanged` overwrite loaded values during initialization.**
 
-В `configGeneral.qml`:
+In `configGeneral.qml`:
 
-| Контрол | Значение из конфига | Запись обратно |
+| Control | Reading config value | Writing back |
 |---|---|---|
 | `SpinBox` | `value: cfg_x` | `onValueModified: cfg_x = value` |
-| `ComboBox` | `currentIndex: {…поиск по model…}` | `onActivated: cfg_x = model[currentIndex].value` |
+| `ComboBox` | `currentIndex: {…search model…}` | `onActivated: cfg_x = model[currentIndex].value` |
 | `CheckBox` | `checked: cfg_x !== false` | `onToggled: cfg_x = checked` |
-| `TextField` (текст) | `onTextEdited` + синхрон в `Component.onCompleted` | `onTextEdited: cfg_x = text` |
-| `TextField` (число, lat/lon) | **НЕ** биндить `text:` напрямую (будет мешать вводу «55.») | `onTextEdited: cfg_x = parseFloat(text)` |
+| `TextField` (text) | `onTextEdited` + sync in `Component.onCompleted` | `onTextEdited: cfg_x = text` |
+| `TextField` (number, lat/lon) | **DO NOT** bind `text:` directly (interferes with typing "55.") | `onTextEdited: cfg_x = parseFloat(text)` |
 
-- Писать обратно **только** через пользовательские сигналы: `onValueModified`, `onActivated`, `onToggled`, `onTextEdited`. Никогда — `onValueChanged`/`onCheckedChanged`.
-- Связка 1:1: каждому `cfg_<name>` в QML соответствует `<entry name="<name>">` в `main.xml`.
-- В QML объявлять и `property var cfg_<name>`, и `property var cfg_<name>Default` (KCM авто-связывает оба).
-
----
-
-## 3. Модель состояния в `main.qml`
-
-- Всё состояние — `property` на корне с префиксом `_` (напр. `_currentTemp`, `_forecasts`, `_sunrise`).
-- Сеть → `parseOpenMeteo(data)` единожды проставляет **все** свойства. UI их только читает.
-- **Преобразования и округление — в источнике** (`parseOpenMeteo`), не в биндингах отображения. Температуры — `Math.round()` сразу при парсинге.
-- Давление: гПа → мм рт. ст. через `* 0.75006`.
-- Шутку «ощущается» пересчитываем в `parseOpenMeteo` → `_feelsJokeText` (один раз за обновление, чтобы не дёргалась при ререндерах).
+- Write back **only** through user-initiated signals: `onValueModified`, `onActivated`, `onToggled`, `onTextEdited`. Never use `onValueChanged`/`onCheckedChanged`.
+- 1:1 mapping: every `cfg_<name>` in QML has a corresponding `<entry name="<name>">` in `main.xml`.
+- In QML, declare both `property var cfg_<name>` and `property var cfg_<name>Default` (KCM auto-binds both).
 
 ---
 
-## 4. Сеть
+## 3. State Model in `main.qml`
 
-- Только `XMLHttpRequest` (QML не применяет CORS — кросс-доменные запросы ок).
-- Обязательно: `xhr.timeout`, `xhr.ontimeout`, `xhr.onerror`, проверка `readyState === DONE` и `status === 200`.
-- **Только бесплатные API без ключей.** Запрещено добавлять эндпоинты, требующие ключи/токены.
-- Разрешённые источники:
-  - `api.open-meteo.com/v1/forecast` — погода
-  - `geocoding-api.open-meteo.com/v1/search` — город → координаты
-  - `ip-api.com/json/` (http) + `ipwhois.app/json/` (фолбэк) — геолокация по IP
-  - `ru.wikipedia.org/api/rest_v1/feed/onthisday/events/MM/DD` — события дня (ru)
-- Перед использованием нового поля API — **проверить `curl`-ом** точное имя и формат (напр. `uv_index_max`, `precipitation_sum`).
+- All state is stored as `property` on the root with a `_` prefix (e.g., `_currentTemp`, `_forecasts`, `_sunrise`).
+- Network → `parseOpenMeteo(data)` sets **all** properties at once. The UI only reads them.
+- **Conversions and rounding happen at the source** (`parseOpenMeteo`), not in display bindings. Temperatures use `Math.round()` immediately during parsing.
+- Pressure: hPa → mmHg via `* 0.75006`.
+- The "feels-like" joke is computed in `parseOpenMeteo` → `_feelsJokeText` (once per update, to avoid re-triggering on re-renders).
 
 ---
 
-## 5. Формирование запроса Open-Meteo
+## 4. Network
 
-- `current` всегда; метрики дня (`sunrise,sunset,uv_index_max,precipitation_sum`) — **всегда**, независимо от режима прогноза.
-- Поля прогноза по дням (`weather_code,temperature_2m_max,...`) — только если `wantDaily`.
-- Массив дневного прогноза собирать **только если есть `daily.weather_code`** (guard), иначе при `forecastMode=hourly` получим мусор.
-- Почасовой прогноз фильтруем от текущего часа (`currentTime.substring(0,13)`), лимит 48 точек.
+- Only `XMLHttpRequest` (QML does not enforce CORS — cross-domain requests are fine).
+- Mandatory: `xhr.timeout`, `xhr.ontimeout`, `xhr.onerror`, check `readyState === DONE` and `status === 200`.
+- **Only free APIs without keys.** It is forbidden to add endpoints that require keys/tokens.
+- Allowed sources:
+  - `api.open-meteo.com/v1/forecast` — weather
+  - `geocoding-api.open-meteo.com/v1/search` — city → coordinates
+  - `ip-api.com/json/` (http) + `ipwhois.app/json/` (fallback) — IP geolocation
+  - `ru.wikipedia.org/api/rest_v1/feed/onthisday/events/MM/DD` — historical events (ru)
+- Before using a new API field, **verify the exact name and format with `curl`** (e.g., `uv_index_max`, `precipitation_sum`).
+
+---
+
+## 5. Building the Open-Meteo Request
+
+- `current` is always included; daily metrics (`sunrise,sunset,uv_index_max,precipitation_sum`) are **always** included, regardless of forecast mode.
+- Daily forecast fields (`weather_code,temperature_2m_max,...`) are included only if `wantDaily`.
+- Assemble the daily forecast array **only if `daily.weather_code` exists** (guard clause), otherwise `forecastMode=hourly` will produce garbage.
+- Hourly forecast is filtered from the current hour onward (`currentTime.substring(0,13)`), with a limit of 48 data points.
 
 ---
 
 ## 6. UI / вёрстка
 
-- **Карточный стиль**: `Rectangle { color: Kirigami.Theme.alternateBackgroundColor; radius: Math.round(Kirigami.Units.largeSpacing*0.8) }`. `ForecastItem` тоже имеет карточный фон.
-- Цвета — **только из темы**: `alternateBackgroundColor` (карточки), `disabledTextColor` (приглушённый), `highlightColor` (акцент), `negativeTextColor` (ошибки). Хардкод цветов — только мелкие эмодзи-акценты.
-- `FullRepresentation` обёрнут в `Flickable` (`boundsBehavior: StopAtBounds`) — контент скроллится.
-- Hero-блок — **центрированная колонка** (`Layout.alignment: Qt.AlignHCenter`), не прижат влево.
+Эталон дизайна — `new_template.html` (тёмный glassmorphism). Полная раскладка в `FullRepresentation.qml`.
+
+- **Стеклянная карточка** — корневой контейнер: `Rectangle { color: Qt.rgba(30/255,30/255,40/255,0.85); radius: gridUnit*1.1; border.color: Qt.rgba(1,1,1,0.1) }`, контент в `Flickable` (`boundsBehavior: StopAtBounds`).
+- **Палитра** (константы на `fullRoot`): `textColor #ffffff`, `subtleColor rgba(1,1,1,0.6)`, `cardColor rgba(1,1,1,0.05)`, `dividerColor rgba(1,1,1,0.1)`, `accentColor #3daee9`, `barCold #4fc3f7`, `barWarm #ffb74d`, `negColor #ef4f4f`.
+- Чтобы Plasma-контролы рендерились светло-на-тёмном, на карточке выставлять `Kirigami.Theme.textColor/disabledTextColor/backgroundColor/highlightColor`.
+- **Шапка**: локация → ряд [эмодзи + крупная тонкая температура (`Font.Light`) | «Ощущается как» справа] → шутка курсивом (`subtleColor`).
+- **Сетка метрик 3×2**: Ветер, Влажность, Давление, Осадки, УФ-индекс, Солнце (восход – закат). **Без иконок** — только label (`subtleColor`) + value (`textColor`, `Font.Medium`). Реализуется `Repeater` внутри `GridLayout`.
+- **Почасовой прогноз** — горизонтальный `ListView`, элементы `ForecastItem` (plain, без фона), первый — «Сейчас».
+- **Прогноз по дням** — вертикальный список (`Repeater` в `ColumnLayout`, **не** вложенный ListView), строка: день / эмодзи / temp-bar / min / max.
+- **temp-bar**: трек `rgba(1,1,1,0.1)` высотой 6px + полоска `Gradient.Horizontal #4fc3f7→#ffb74d`; позиция/ширина — доли от `(t_min−weekMin)/(weekMax−weekMin)`, `weekMin/weekMax` считаются по всем дням прогноза.
+- `ForecastItem` — только почасовой (plain, без карточного фона).
 - Размеры — через `Kirigami.Units.gridUnit`, отступы — `largeSpacing`/`smallSpacing`.
 - Импорты (эталонный набор):
   ```
@@ -107,116 +118,217 @@ install.sh                        # копирует package/ в plasma/plasmoid
   import org.kde.plasma.plasmoid 2.0
   import org.kde.kirigami 2.20 as Kirigami
   ```
-- У `ToolButton` без текста **не** ставить `display:` — лишнее и рискованно с enum Plasma-типов.
+- У `ToolButton` без текста **не** ставить `display:`.
 
 ---
 
-## 7. Даты и время (timezone-safe)
+## 7. Dates and Time (Timezone-Safe)
 
-- **Не использовать `new Date(isoString)` для прогнозных меток** — ломается на часовых поясах.
-- Парсить ISO подстрокой: `"2026-07-25T14:00"` → `split("T")[1].substring(0,5)` → `"14:00"` (см. `isoToHM`, `formatHour` в ForecastItem).
-- День недели — алгоритм Томохико Сакамото (`formatDay` в ForecastItem), без `Date`.
-- Текущее локальное время (для таймера/«обновлено в») — `new Date().toLocaleTimeString(Qt.locale(), "hh:mm")` — ок.
-
----
-
-## 8. Контент и язык
-
-- Весь интерфейс — **на русском**.
-- WMO-коды (0–99) → emoji + русское описание через карту `wmoInfo()` в `main.qml`.
-- Направление ветра (градусы) → русские румбы (`windDegToCompass()`): С, СВ, ЮЗ…
-- Праздники — оффлайн-словарь `holidaysForMonthDay()` (без сети).
-- Шутки «ощущается как» — **язвительные**, массивы вариантов по диапазонам в `feelsLikeJoke()`, случайный выбор. Температуру нормализуем в °C для сравнения (учёт °F).
+- **Do not use `new Date(isoString)` for forecast timestamps** — it breaks across timezones.
+- Parse ISO strings with substring: `"2026-07-25T14:00"` → `split("T")[1].substring(0,5)` → `"14:00"` (see `isoToHM`, `formatHour` in ForecastItem).
+- Day-of-week uses the Tomohiko Sakamoto algorithm (`formatDay` in ForecastItem), no `Date`.
+- Current local time (for timer / "last updated") — `new Date().toLocaleTimeString(Qt.locale(), "hh:mm")` is fine.
 
 ---
 
-## 9. Git workflow (обязательно)
+## 8. Internationalization (i18n)
 
-- **Каждое изменение фиксируется коммитом.** Не оставлять незафиксированных правок «в воздухе».
-- **Вся работа — в отдельной ветке** от `master`. Имя ветки — краткое и описательное (`feat/sunrise-metrics`, `fix/forecast-days-spinbox`, `docs/agent-rules`).
-- Порядок:
+- The UI language follows the system locale. All user-visible strings must use KDE i18n functions.
+- `i18n("string")` — plain string.
+- `i18nc("context", "string")` — when the same English text needs different translations depending on context.
+- `i18np("singular", "plural", n)` — plural forms.
+- Hardcoded UI strings are **forbidden**. Every label, tooltip, error message, and unit label must be an `i18n()` call.
+- Code-level identifiers, API field names, and debug logs remain in English.
+- All `_`-prefixed state properties that hold display strings (like `_currentConditionRu`) must be renamed to locale-agnostic names and populated from `i18n()` calls.
+
+**How it works in practice:**
+- Source strings in `i18n(...)` are in **English**.
+- Translations live in `.po` files under `contents/locale/<lang>/LC_MESSAGES/`.
+- Plasma loads the correct `.mo` file at runtime based on the system language.
+- The default (`en`) strings are the English `msgid` values in code — no `.po` needed for English.
+
+### Strings that need `i18n()`
+
+| Category | Example |
+|---|---|
+| WMO weather descriptions | `i18n("Clear")`, `i18n("Rain")` |
+| Compass directions | `i18nc("wind direction", "N")`, `i18nc("wind direction", "NE")` |
+| UI labels | `i18n("Wind")`, `i18n("Humidity")`, `i18n("Pressure")` |
+| Unit labels | `i18nc("wind speed", "m/s")`, `i18nc("temperature", "°C")` |
+| Error messages | `i18n("Network error")`, `i18n("HTTP error %1").arg(status)` |
+| Feels-like jokes | `i18n("Put on a hat. Mom is watching, implicitly.")` |
+| Settings labels | `i18n("Update interval (min):")` |
+| Holiday names | `i18n("New Year")`, `i18nc("holiday", "Christmas")` |
+| Forecast labels | `i18n("Daily")`, `i18n("Hourly")`, `i18n("Now")` |
+
+### Parameters
+
+Use `%1`, `%2` etc. for dynamic values:
+```qml
+i18n("Feels like %1%2").arg(feelsLike).arg(tempUnitLabel)
+```
+
+---
+
+## 9. Git Workflow (Mandatory)
+
+- **Every change is committed.** Do not leave uncommitted changes hanging.
+- **All work is done in a dedicated branch** off `master`. Branch names are short and descriptive (`feat/sunrise-metrics`, `fix/forecast-days-spinbox`, `docs/agent-rules`).
+- Procedure:
   ```bash
-  git checkout master && git pull               # актуальный master (если есть remote)
-  git checkout -b <тип>/<кратко>                # новая ветка
-  # … правки, qmllint, тесты по §11 …
-  git add -A && git commit -m "<сообщение>"     # можно несколько логичных коммитов
-  git checkout master && git merge --no-ff <ветка>   # влить в master
-  git branch -d <ветка>                         # удалить слитую ветку
+  git checkout master && git pull               # get current master (if remote exists)
+  git checkout -b <type>/<short-name>           # new branch
+  # … edits, qmllint, tests per §10 …
+  git add -A && git commit -m "<message>"       # may be multiple coherent commits
+  git checkout master && git merge --no-ff <branch>   # merge into master
+  git branch -d <branch>                        # delete merged branch
   ```
-- Сообщения коммитов — осмысленные; префикс типа по желанию: `feat:`, `fix:`, `docs:`, `refactor:`.
-- Сливать в `master` **только после** прохождения линта и тестов (см. §11).
-- При наличии remote — `git push` после слияния.
+- Commit messages are meaningful; optional type prefix: `feat:`, `fix:`, `docs:`, `refactor:`.
+- Merge into `master` **only after** passing lint and tests (see §10).
+- If a remote exists, `git push` after merging.
 
-## 10. Документация (держим в синхроне)
+## 10. Translation Workflow
 
-- Любое изменение поведения/функционала → **обновить документацию в том же коммите**:
-  - `README.md` — пользовательские возможности, настройки, список метрик;
-  - `AGENT.md` — если меняются соглашения, API, структура или workflow.
-- Новую настройку — упомянуть в README (раздел «Настройка») и в §13.
-- Не оставлять рассинхрон: код и текст описывают одно и то же состояние.
+### Directory structure
 
-## 11. Definition of Done — перед словами «всё готово»
+```
+package/contents/locale/
+├── ru/
+│   └── LC_MESSAGES/
+│       └── plasmoid_com.github.vladimirm.openmeteo-weather.po
+├── de/
+│   └── LC_MESSAGES/
+│       └── plasmoid_com.github.vladimirm.openmeteo-weather.po
+└── …
+```
 
-Говорить, что готово, **только после**:
+Each `.po` file is a gettext translation file. The filename follows the pattern `plasmoid_<applet-id>.po`.
 
-1. `qmllint package/contents/ui/*.qml` — без ошибок.
-2. Новые/изменённые поля API проверены `curl`-ом (имена + формат).
-3. Установлено: `./install.sh --user` + `plasmashell --replace &`.
-4. Виджет реально открыт и проверен визуально/функционально:
-   - текущая погода, шутка, метрики дня, карточка «Сегодня», прогноз;
-   - все режимы прогноза: `daily`, `hourly`, `both`;
-   - настройки открываются, **значения восстанавливаются корректно** (особенно SpinBox/ComboBox), сохраняются;
-   - переключение единиц (°C/°F, единицы ветра) — без артефактов;
-   - при ошибке сети — карточка ошибки с «Повторить».
-5. Документация обновлена.
-6. Изменения закоммичены и слиты в `master` (§9).
+### Updating translations
 
-Пока пункт не пройден — задача не завершена, «готово» не говорить.
+When new `i18n()` calls are added or existing ones change:
 
-## 12. Чеклист перед коммитом/PR
+1. **Extract** new strings into the template:
+   ```bash
+   xgettext -L JavaScript -o po/template.pot package/contents/ui/*.qml \
+     --keyword=i18n --keyword=i18nc:1c,2 --keyword=i18np:1,2
+   ```
+2. **Merge** into each language `.po`:
+   ```bash
+   msgmerge -U package/contents/locale/ru/LC_MESSAGES/plasmoid_com.github.vladimirm.openmeteo-weather.po po/template.pot
+   ```
+3. **Fill in** translations for new `msgid` entries in each `.po` file.
+4. **Compile** `.po` → `.mo` for runtime:
+   ```bash
+   msgfmt -o package/contents/locale/ru/LC_MESSAGES/plasmoid_com.github.vladimirm.openmeteo-weather.mo \
+            package/contents/locale/ru/LC_MESSAGES/plasmoid_com.github.vladimirm.openmeteo-weather.po
+   ```
+   The `install.sh` script does this automatically.
 
-- [ ] `qmllint` чист по всем `.qml`.
-- [ ] Нет хардкод-цветов вне темы; нет `onValueChanged`/`onCheckedChanged` для `cfg_*`.
-- [ ] Новые свойства состояния объявлены на корне `main.qml` с префиксом `_` и проставляются в `parseOpenMeteo`.
-- [ ] Округление/формат — в источнике, не в UI.
-- [ ] Сеть: `timeout`/`ontimeout`/`onerror` есть; бесплатный API без ключа.
-- [ ] Новые настройки связаны 1:1 `main.xml` ↔ `cfg_*`.
-- [ ] README/AGENT обновлены.
-- [ ] Тест по §11 пройден.
+### Rules
 
-## 13. Как добавить новую настройку end-to-end
+- Never edit `.mo` files directly — always edit `.po` and recompile.
+- Keep `.po` files committed in the repository.
+- Add `po/template.pot` to the repository for CI/contributor workflows.
+- When adding a new language, create a new directory `contents/locale/<lang>/LC_MESSAGES/` with the `.po` file.
+- Always update translations **in the same commit** that adds/changes the source strings.
+- If a translation is missing for a string, Plasma falls back to the English `msgid` — acceptable temporarily, but fill in missing translations before release.
 
-1. **`contents/config/main.xml`** — добавить `<entry name="<name>" type="Int|Double|String|Bool"><default>…</default></entry>` в группу `General`.
+### `Makefile` targets (optional, for convenience)
+
+If a `Makefile` exists at the project root, these targets should be defined:
+
+| Target | Action |
+|---|---|
+| `make pot` | Extract strings → `po/template.pot` |
+| `make po`  | Merge `po/template.pot` into all `.po` files |
+| `make mo`  | Compile all `.po` → `.mo` in `contents/locale/` |
+
+## 11. Documentation (Keep in Sync)
+
+- Any behavior/feature change → **update documentation in the same commit**:
+  - `README.md` — user-facing features, settings, list of metrics;
+  - `AGENT.md` — if conventions, API, structure, or workflow change.
+- New settings — mention in README (section "Settings") and in §12.
+- New or changed translatable strings — update `.po` files (see §10).
+- Do not let code and docs drift out of sync: both describe the same state.
+
+## 12. Definition of Done — Before Saying "It's Ready"
+
+Say "done" is ready **only after**:
+
+1. `qmllint package/contents/ui/*.qml` — no errors.
+2. New/changed API fields verified with `curl` (names + format).
+3. Installed: `./install.sh --user` + `plasmashell --replace &`.
+4. Widget actually opened and tested visually/functionally:
+   - current weather, joke, daily metrics, "Today" card, forecast;
+   - all forecast modes: `daily`, `hourly`, `both`;
+   - settings open, **values restore correctly** (especially SpinBox/ComboBox), save works;
+   - unit switching (°C/°F, wind units) — no artifacts;
+   - on network error — error card with "Retry" button.
+5. Documentation updated (§11).
+6. `.po` files updated, translations filled, `.mo` compiled (see §10).
+7. Changes committed and merged into `master` (§9).
+
+If a step is not complete, the task is not done — do not say "ready".
+
+## 13. Pre-Commit / PR Checklist
+
+- [ ] `qmllint` clean on all `.qml` files.
+- [ ] No hardcoded colors outside the theme; no `onValueChanged`/`onCheckedChanged` for `cfg_*`.
+- [ ] New state properties declared on the `main.qml` root with `_` prefix and populated in `parseOpenMeteo`.
+- [ ] Rounding/formatting done at source, not in UI.
+- [ ] All user-visible strings use `i18n()`/`i18nc()` instead of hardcoded text.
+- [ ] Network: `timeout`/`ontimeout`/`onerror` present; free API without key.
+- [ ] New settings have 1:1 mapping `main.xml` ↔ `cfg_*`.
+- [ ] `.po` files updated, translations filled, `.mo` compiled.
+- [ ] README/AGENT updated.
+- [ ] Tests per §12 passed.
+
+## 14. How to Add a New Setting End-to-End
+
+1. **`contents/config/main.xml`** — add `<entry name="<name>" type="Int|Double|String|Bool"><default>…</default></entry>` in the `General` group.
 2. **`contents/ui/configGeneral.qml`**:
-   - объявить `property var cfg_<name>` и `property var cfg_<name>Default`;
-   - добавить контрол по правилам §2 (прямой биндинг + пользовательский сигнал).
-3. **`contents/ui/main.qml`** — читать `plasmoid.configuration.<name>` (с фолбэком `|| default`), использовать в логике.
-4. При необходимости — UI-элемент в `FullRepresentation.qml`.
-5. **Тест**: переустановить пакет и **пересоздать виджет** (иначе новая схема `main.xml` может не подхватиться), проверить сохранение/восстановление значения.
-6. Обновить README (раздел «Настройка»).
-7. Коммит + merge по §9.
+   - declare `property var cfg_<name>` and `property var cfg_<name>Default`;
+   - add a control following §2 rules (direct binding + user-initiated signal);
+   - use `i18n()` for all user-visible strings (labels, button text, tooltips).
+3. **`contents/ui/main.qml`** — read `plasmoid.configuration.<name>` (with `|| default` fallback), use in logic.
+4. If needed, add a UI element in `FullRepresentation.qml` (use `i18n()` for strings).
+5. **Test**: reinstall the package and **re-create the widget** (otherwise the new `main.xml` schema may not be picked up), check save/restore.
+6. Update README (section "Settings").
+7. Update `.po` files (extract + translate + compile, see §10).
+8. Commit + merge per §9.
 
-## 14. Антипаттерны
+## 15. Anti-Patterns
 
-- ❌ API-ключи, платные/требующие токены эндпоинты.
-- ❌ `onValueChanged`/`onCheckedChanged` для записи `cfg_*` в настройках.
-- ❌ Округление/форматирование в слое отображения (делать в `parseOpenMeteo`).
-- ❌ `new Date(isoForecastString)` для разбора прогноза.
-- ❌ Хардкод цветов там, где есть аналог в `Kirigami.Theme`.
-- ❌ Логика сети/парсинга вне `main.qml`.
-- ❌ Коммитить без `qmllint` и без теста (§11).
-- ❌ Дубликат `visible:`/свойства в одном объекте (даже если `qmllint` промолчал — движок упадёт).
-- ❌ Работать напрямую в `master` или оставлять незафиксированные правки.
-- ❌ Говорить «готово» до прохождения §11.
+- ❌ API keys, paid or token-requiring endpoints.
+- ❌ `onValueChanged`/`onCheckedChanged` for writing `cfg_*` in settings.
+- ❌ Rounding/formatting in the display layer (do it in `parseOpenMeteo`).
+- ❌ `new Date(isoForecastString)` for forecast parsing.
+- ❌ Hardcoded colors where a `Kirigami.Theme` equivalent exists.
+- ❌ Network/parsing logic outside `main.qml`.
+- ❌ Committing without `qmllint` and without testing (§12).
+- ❌ Duplicate `visible:`/property in the same object (even if `qmllint` is silent — the engine will crash).
+- ❌ Working directly in `master` or leaving uncommitted changes.
+- ❌ Saying "ready" before passing §12.
+- ❌ Hardcoded UI strings instead of `i18n()`/`i18nc()` calls.
+- ❌ `.po` files out of sync with code (missing strings or stale translations).
+- ❌ Mixing `i18n()` and non-`i18n()` strings in the same UI element.
+- ❌ Editing `.mo` files directly (edit `.po` and recompile).
+- ❌ Adding new `i18n()` strings without updating `.po` files in the same commit.
 
-## 15. Полезные команды
+## 16. Useful Commands
 
 ```bash
-qmllint package/contents/ui/*.qml                      # проверка синтаксиса
-./install.sh --user                                    # установка пользователю
-plasmashell --replace &                                # перезапуск оболочки
-git checkout -b feat/<name>                            # ветка для задачи
-git add -A && git commit -m "feat: …"                  # зафиксировать
-git checkout master && git merge --no-ff feat/<name>   # влить в master
+qmllint package/contents/ui/*.qml                      # syntax check
+./install.sh --user                                    # user-local install (compiles .mo too)
+plasmashell --replace &                                # restart shell
+make pot                                                # extract strings → po/template.pot
+make po                                                 # merge into existing .po files
+msgfmt -o package/contents/locale/ru/LC_MESSAGES/plasmoid_com.github.vladimirm.openmeteo-weather.mo \
+         package/contents/locale/ru/LC_MESSAGES/plasmoid_com.github.vladimirm.openmeteo-weather.po
+git checkout -b feat/<name>                            # branch for a task
+git add -A && git commit -m "feat: …"                  # commit
+git checkout master && git merge --no-ff feat/<name>   # merge into master
 curl -s "https://api.open-meteo.com/v1/forecast?latitude=55.75&longitude=37.62&daily=sunrise,sunset&timezone=Europe/Moscow&forecast_days=1"
 ```
