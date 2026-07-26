@@ -82,6 +82,7 @@ In `configGeneral.qml`:
   - `geocoding-api.open-meteo.com/v1/search` — city → coordinates
   - `ip-api.com/json/` (http) + `ipwhois.app/json/` (fallback) — IP geolocation
   - `ru.wikipedia.org/api/rest_v1/feed/onthisday/events/MM/DD` — historical events (ru)
+  - `htmlweb.ru/json/calendar/list` — holidays (keyless, but **~20 req/day/IP**; fetch **once per day** via `_holidaysDate` cache; fall back to the offline dictionary on error/limit)
 - Before using a new API field, **verify the exact name and format with `curl`** (e.g., `uv_index_max`, `precipitation_sum`).
 
 ---
