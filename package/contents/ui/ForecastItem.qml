@@ -35,9 +35,16 @@ Item {
         return t.substring(0, 5)
     }
 
+    // card background
+    Rectangle {
+        anchors.fill: parent
+        color: Kirigami.Theme.alternateBackgroundColor
+        radius: Math.round(Kirigami.Units.largeSpacing * 0.8)
+    }
+
     ColumnLayout {
         anchors.fill: parent
-        anchors.margins: Kirigami.Units.smallSpacing
+        anchors.margins: Kirigami.Units.smallSpacing * 1.3
         spacing: 2
 
         // ── Header: day-of-week (daily) or hour (hourly) ──────────────────
