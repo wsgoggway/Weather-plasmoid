@@ -3,21 +3,27 @@ import QtQuick.Layouts 1.15
 import QtQuick.Controls 2.15
 import org.kde.plasma.components 3.0 as PlasmaComponents
 import org.kde.plasma.plasmoid 2.0
+import org.kde.plasma.extras 2.0 as PlasmaExtras
 import org.kde.kirigami 2.20 as Kirigami
 
 /*
- * Full representation — dark-glass card matching new_template.html.
- * Layout: glass background fills the whole popup (sibling of the Flickable,
- * so there is no gap when content is shorter than the popup); Kirigami.Theme
- * is set on the root so all Plasma controls render light-on-dark.
+ * Full representation — dark-glass, full-bleed. Root is PlasmaExtras.Representation
+ * with collapseMarginsHint so the glass fills the whole popup platter (no
+ * external Plasma margins). Kirigami.Theme is set on the root so all Plasma
+ * controls render light-on-dark.
  * Sections: location header (big thin temp + feels-like right + italic quip),
  * 3×2 metrics grid, hourly forecast (horizontal), divider, daily forecast
  * (vertical rows with gradient temp-bars).
  */
-Item {
+PlasmaExtras.Representation {
     id: fullRoot
 
     required property PlasmoidItem plasmoidItem
+
+    // Full-bleed: collapse the popup's content margins/borders; no Page padding,
+    // so the glass background fills the entire platter edge to edge.
+    collapseMarginsHint: true
+    padding: 0
 
     Layout.minimumWidth: Kirigami.Units.gridUnit * 20
     Layout.minimumHeight: Kirigami.Units.gridUnit * 16
@@ -93,9 +99,7 @@ Item {
         id: glassBg
         anchors.fill: parent
         color: fullRoot.glassColor
-        radius: Kirigami.Units.gridUnit * 0.9
-        border.color: fullRoot.dividerColor
-        border.width: 1
+        radius: 0
     }
 
     Flickable {
