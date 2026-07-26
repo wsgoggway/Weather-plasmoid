@@ -53,6 +53,7 @@ plasmashell --replace &
    - **Wind speed unit** — m/s, km/h, mph, knots
    - **Forecast mode** — по дням / по часам / оба
    - **Forecast days** — до 16 дней
+   - **Сегодня** — показывать праздники и «этот день в истории» (вкл/выкл)
 
 ## Структура проекта
 

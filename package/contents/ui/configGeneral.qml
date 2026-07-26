@@ -18,6 +18,7 @@ KCM.SimpleKCM {
     property var cfg_temperatureUnit
     property var cfg_windSpeedUnit
     property var cfg_forecastMode
+    property var cfg_showToday
 
     // KCM also sets cfg_*Default from main.xml — accept silently
     property var cfg_latitudeDefault
@@ -30,6 +31,7 @@ KCM.SimpleKCM {
     property var cfg_temperatureUnitDefault
     property var cfg_windSpeedUnitDefault
     property var cfg_forecastModeDefault
+    property var cfg_showTodayDefault
 
     // ── Sync UI fields from cfg_* on load ──────────────────────────────────
     // Note: only TextFields need manual sync (to avoid fighting the user while
@@ -284,6 +286,13 @@ KCM.SimpleKCM {
             enabled: showForecastCheck.checked
             value: cfg_forecastDays
             onValueModified: cfg_forecastDays = value
+        }
+
+        CheckBox {
+            Kirigami.FormData.label: "Сегодня:"
+            text: "Праздники и этот день в истории"
+            checked: cfg_showToday !== false
+            onToggled: cfg_showToday = checked
         }
     } // FormLayout
     } // Item
