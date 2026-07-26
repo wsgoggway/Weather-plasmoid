@@ -32,23 +32,15 @@ KCM.SimpleKCM {
     property var cfg_forecastModeDefault
 
     // ── Sync UI fields from cfg_* on load ──────────────────────────────────
+    // Note: only TextFields need manual sync (to avoid fighting the user while
+    // typing into a bound numeric field). SpinBox/ComboBox/CheckBox use direct
+    // bindings + user-only signals (onValueModified/onActivated/onToggled) so
+    // they never clobber the loaded config value during initialization.
     Component.onCompleted: {
         latitudeField.text  = String(cfg_latitude  || 55.7558)
         longitudeField.text = String(cfg_longitude || 37.6173)
         cityNameField.text  = cfg_cityName || ""
         timezoneField.text  = cfg_timezone || "Europe/Moscow"
-        updateIntervalSpin.value  = cfg_updateInterval || 30
-        showForecastCheck.checked = cfg_showForecast !== false
-        forecastDaysSpin.value    = cfg_forecastDays || 7
-        for (var i = 0; i < tempUnitCombo.model.length; i++)
-            if (tempUnitCombo.model[i].value === (cfg_temperatureUnit || "celsius"))
-                { tempUnitCombo.currentIndex = i; break }
-        for (var j = 0; j < windUnitCombo.model.length; j++)
-            if (windUnitCombo.model[j].value === (cfg_windSpeedUnit || "ms"))
-                { windUnitCombo.currentIndex = j; break }
-        for (var k = 0; k < forecastModeCombo.model.length; k++)
-            if (forecastModeCombo.model[k].value === (cfg_forecastMode || "daily"))
-                { forecastModeCombo.currentIndex = k; break }
     }
 
     // ── Geocode city name → coordinates (Open-Meteo Geocoding API) ─────────
@@ -223,7 +215,8 @@ KCM.SimpleKCM {
             id: updateIntervalSpin
             Kirigami.FormData.label: "Интервал обновления (мин):"
             from: 5; to: 180; stepSize: 5
-            onValueChanged: cfg_updateInterval = value
+            value: cfg_updateInterval
+            onValueModified: cfg_updateInterval = value
         }
 
         ComboBox {
@@ -232,7 +225,13 @@ KCM.SimpleKCM {
             textRole: "text"
             model: [{ text: "Цельсий (°C)", value: "celsius" },
                     { text: "Фаренгейт (°F)", value: "fahrenheit" }]
-            onActivated: { cfg_temperatureUnit = model[currentIndex].value }
+            currentIndex: {
+                var v = cfg_temperatureUnit || "celsius"
+                for (var i = 0; i < model.length; i++)
+                    if (model[i].value === v) return i
+                return 0
+            }
+            onActivated: cfg_temperatureUnit = model[currentIndex].value
         }
 
         ComboBox {
@@ -243,7 +242,13 @@ KCM.SimpleKCM {
                     { text: "км/ч", value: "kmh" },
                     { text: "миль/ч", value: "mph" },
                     { text: "узлы", value: "kn" }]
-            onActivated: { cfg_windSpeedUnit = model[currentIndex].value }
+            currentIndex: {
+                var v = cfg_windSpeedUnit || "ms"
+                for (var i = 0; i < model.length; i++)
+                    if (model[i].value === v) return i
+                return 0
+            }
+            onActivated: cfg_windSpeedUnit = model[currentIndex].value
         }
 
         // ── Forecast section ──────────────────────────────────────────────
@@ -251,7 +256,8 @@ KCM.SimpleKCM {
             id: showForecastCheck
             Kirigami.FormData.label: "Прогноз:"
             text: "Показывать прогноз"
-            onCheckedChanged: cfg_showForecast = checked
+            checked: cfg_showForecast !== false
+            onToggled: cfg_showForecast = checked
         }
 
         ComboBox {
@@ -262,7 +268,13 @@ KCM.SimpleKCM {
             model: [{ text: "По дням", value: "daily" },
                     { text: "По часам", value: "hourly" },
                     { text: "Дни + Часы", value: "both" }]
-            onActivated: { cfg_forecastMode = model[currentIndex].value }
+            currentIndex: {
+                var v = cfg_forecastMode || "daily"
+                for (var i = 0; i < model.length; i++)
+                    if (model[i].value === v) return i
+                return 0
+            }
+            onActivated: cfg_forecastMode = model[currentIndex].value
         }
 
         SpinBox {
@@ -270,7 +282,8 @@ KCM.SimpleKCM {
             Kirigami.FormData.label: "Дней прогноза:"
             from: 1; to: 16; stepSize: 1
             enabled: showForecastCheck.checked
-            onValueChanged: cfg_forecastDays = value
+            value: cfg_forecastDays
+            onValueModified: cfg_forecastDays = value
         }
     } // FormLayout
     } // Item
