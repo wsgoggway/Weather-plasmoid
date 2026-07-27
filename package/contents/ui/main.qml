@@ -195,10 +195,65 @@ PlasmoidItem {
         return m[code] || ["🌈","Неизвестно"]
     }
 
-    // ── Sarcastic "feels like" quip (varied; random pick per refresh) ───────
-    // feelsLike is given in the displayed unit (°C / °F); we normalize to °C.
-    function feelsLikeJoke(feelsLike, unitLabel) {
+    // ── Sarcastic "feels like" quip ─────────────────────────────────────────
+    // Temperature-normalized buckets PLUS context pools (rain / snow / storm /
+    // fog / strong wind / high UV). When a context condition is active, we bias
+    // toward it (~70%); otherwise a temperature joke. feelsLike is in the
+    // displayed unit (°C / °F), windMs is normalized to m/s.
+    function feelsLikeJoke(feelsLike, unitLabel, wmo, windMs, uv) {
         if (feelsLike === null || feelsLike === undefined) return ""
+        var temp = tempJokes(feelsLike, unitLabel)
+        var specials = []
+        if (wmo >= 95) specials = specials.concat(STORM_JOKES)   // thunderstorm first
+        if (isRainy(wmo)) specials = specials.concat(RAIN_JOKES)
+        if (isSnowy(wmo)) specials = specials.concat(SNOW_JOKES)
+        if (isFoggy(wmo)) specials = specials.concat(FOG_JOKES)
+        if (windMs >= 10) specials = specials.concat(WIND_JOKES) // ~strong breeze (36 km/h)
+        if (uv >= 7) specials = specials.concat(UV_JOKES)       // high / very high
+        if (specials.length && Math.random() < 0.7) return pickJoke(specials)
+        return pickJoke(temp)
+    }
+
+    function pickJoke(arr) { return arr.length ? arr[Math.floor(Math.random() * arr.length)] : "" }
+    function isRainy(c) { return [51,53,55,56,57,61,63,65,66,67,80,81,82,95,96,99].indexOf(c) >= 0 }
+    function isSnowy(c) { return [71,73,75,77,85,86].indexOf(c) >= 0 }
+    function isFoggy(c) { return c === 45 || c === 48 }
+
+    readonly property var RAIN_JOKES: [
+        "Дождь. Зонт сегодня не каприз, а средство выживания.",
+        "Идеальная погода, чтобы остаться дома. Оправдание есть.",
+        "Дождь проверяет твою веру в прогноз — и обычно проигрывает.",
+        "Мокро так, что носки предают тебя в первые же минуты."
+    ]
+    readonly property var SNOW_JOKES: [
+        "Снег. Природа решила, что тебе нужен белый шум в жизни.",
+        "Снежинки красивые, пока не станут слякотью под ногами.",
+        "Зима вспомнила, что она, вообще-то, зима.",
+        "Снег — бесплатный декор за твой счёт (убирать)."
+    ]
+    readonly property var STORM_JOKES: [
+        "Гроза. Природа устраивает световое шоу за твой счёт.",
+        "Молния, гром — природа явно требует внимания.",
+        "Гроза: сиди дома и делай вид, что не боишься."
+    ]
+    readonly property var FOG_JOKES: [
+        "Туман. Видимость ноль — идеально, чтобы не видеть дедлайны.",
+        "Туман превращает улицу в декорации к хоррору. Бесплатно."
+    ]
+    readonly property var WIND_JOKES: [
+        "Ветер такой, что идёшь в одну сторону, а несёт в другую.",
+        "Шапку держи. Причёску забудь — её уже нет.",
+        "Ветер бесплатно делает тебе экспресс-пилинг лица.",
+        "Зонты сегодня живут опасно и недолго."
+    ]
+    readonly property var UV_JOKES: [
+        "Солнце решило, что ты слишком бледный. Намёк понят.",
+        "Крем от солнца — не совет, а приказ. Иначе станешь помидором.",
+        "УФ такой, что тень официально стала твоим лучшим другом."
+    ]
+
+    // Returns the joke array for the feels-like temperature range.
+    function tempJokes(feelsLike, unitLabel) {
         var c = feelsLike
         if (unitLabel === "°F") c = (feelsLike - 32) * 5 / 9
         // [threshold, [variants...]] — first threshold that c is below wins
@@ -283,13 +338,9 @@ PlasmoidItem {
             ]]
         ]
         for (var i = 0; i < buckets.length; i++) {
-            if (c < buckets[i][0]) {
-                var arr = buckets[i][1]
-                return arr[Math.floor(Math.random() * arr.length)]
-            }
+            if (c < buckets[i][0]) return buckets[i][1]
         }
-        var hot = buckets[buckets.length - 1][1]
-        return hot[Math.floor(Math.random() * hot.length)]
+        return buckets[buckets.length - 1][1]
     }
 
     // ── Small format helpers ────────────────────────────────────────────────
@@ -403,8 +454,13 @@ PlasmoidItem {
         _uvIndex = (uvArr.length && uvArr[0] != null) ? Math.round(uvArr[0] * 10) / 10 : 0
         _precipSum = (precipArr.length && precipArr[0] != null) ? Math.round(precipArr[0] * 10) / 10 : 0
 
-        // Sarcastic quip for the current feels-like temperature (varied)
-        _feelsJokeText = feelsLikeJoke(_currentFeelsLike, _tempUnitLabel)
+        // Sarcastic quip — temperature + context (rain/snow/storm/fog/wind/UV)
+        var wu = plasmoid.configuration.windSpeedUnit || "ms"
+        var windMs = cur.wind_speed_10m != null ? cur.wind_speed_10m : 0
+        if (wu === "kmh") windMs = windMs / 3.6
+        else if (wu === "mph") windMs = windMs * 0.44704
+        else if (wu === "kn") windMs = windMs * 0.514444
+        _feelsJokeText = feelsLikeJoke(_currentFeelsLike, _tempUnitLabel, wmo, windMs, _uvIndex)
 
         // Daily forecast (only when daily forecast fields were requested)
         var arr = []
