@@ -14,9 +14,9 @@ Item {
     property var appletRef: null
     property bool isFirst: false
 
-    // dark-glass palette (kept local so this component is self-contained)
-    readonly property color textColor: "#ffffff"
-    readonly property color subtleColor: Qt.rgba(1, 1, 1, 0.6)
+    // theme-aware palette (follows the system light/dark theme)
+    readonly property color textColor: Kirigami.Theme.textColor
+    readonly property color subtleColor: Kirigami.Theme.disabledTextColor
 
     implicitWidth: Kirigami.Units.gridUnit * 3.4
     implicitHeight: Kirigami.Units.gridUnit * 5.4

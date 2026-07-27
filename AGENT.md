@@ -96,17 +96,16 @@ In `configGeneral.qml`:
 
 ## 6. UI / Layout
 
-Design reference: `new_template.html` (dark glassmorphism). The full layout lives in `FullRepresentation.qml`.
+Design: theme-aware (adapts to the system light/dark theme). The full layout lives in `FullRepresentation.qml`.
 
-- **Glass card** — root container: `Rectangle { color: Qt.rgba(30/255,30/255,40/255,0.85); radius: gridUnit*1.1; border.color: Qt.rgba(1,1,1,0.1) }`, content inside a `Flickable` (`boundsBehavior: StopAtBounds`).
-- **Palette** (constants on `fullRoot`): `textColor #ffffff`, `subtleColor rgba(1,1,1,0.6)`, `cardColor rgba(1,1,1,0.05)`, `dividerColor rgba(1,1,1,0.1)`, `accentColor #3daee9`, `barCold #4fc3f7`, `barWarm #ffb74d`, `negColor #ef4f4f`.
-- To render Plasma controls light-on-dark, set `Kirigami.Theme.textColor/disabledTextColor/backgroundColor/highlightColor` on the card.
+- **Root** — `PlasmaExtras.Representation` with `collapseMarginsHint: true` + `padding: 0` → full-bleed (the background fills the whole popup platter, no Plasma margins). A `Rectangle` (`glassBg`) fills it with the theme background.
+- **Palette** (constants on `fullRoot`, all theme-derived): `textColor = Kirigami.Theme.textColor`, `subtleColor = Kirigami.Theme.disabledTextColor`, `glassColor = Kirigami.Theme.backgroundColor`, `cardColor = Kirigami.Theme.alternateBackgroundColor`, `dividerColor = textColor @ 12% alpha`, `accentColor = Kirigami.Theme.highlightColor`, `negColor = Kirigami.Theme.negativeTextColor`. Only `barCold #4fc3f7` / `barWarm #ffb74d` are hardcoded (decorative temp gradient, visible on both themes). Do **not** override `Kirigami.Theme.*` — use the real system theme.
 - **Header**: location → row [emoji + large thin temperature (`Font.Light`) | "Feels like" on the right] → the joke in italics (`subtleColor`).
-- **Metrics grid 3×2**: Wind, Humidity, Pressure, Precipitation, UV index, Sun (sunrise – sunset). **No icons** — only a label (`subtleColor`) + value (`textColor`, `Font.Medium`). Implemented with a `Repeater` inside a `GridLayout`.
+- **Metrics grid 3×2**: Wind, Humidity, Pressure, Precipitation, UV index, Sun (sunrise – sunset). Each cell: an **icon-prefixed label** (`subtleColor`) + value (`textColor`, `Font.Medium`). Implemented with a `Repeater` inside a `GridLayout`.
 - **Hourly forecast** — horizontal `ListView`; items are `ForecastItem` (plain, no background); the first item shows "Now".
 - **Daily forecast** — vertical list (`Repeater` inside a `ColumnLayout`, **not** a nested ListView); each row: day / emoji / temp-bar / min / max.
-- **temp-bar**: a `rgba(1,1,1,0.1)` track 6px tall + a `Gradient.Horizontal #4fc3f7→#ffb74d` fill; its position/width are fractions of `(t_min−weekMin)/(weekMax−weekMin)`, where `weekMin`/`weekMax` are computed across all forecast days.
-- `ForecastItem` is hourly-only (plain, no card background).
+- **temp-bar**: a `dividerColor` track 6px tall + a `Gradient.Horizontal #4fc3f7→#ffb74d` fill; its position/width are fractions of `(t_min−weekMin)/(weekMax−weekMin)`, where `weekMin`/`weekMax` are computed across all forecast days.
+- `ForecastItem` is hourly-only (plain, no card background; theme-aware colors).
 - Sizing via `Kirigami.Units.gridUnit`; spacing via `largeSpacing`/`smallSpacing`.
 - All user-visible label/value strings use `i18n()` (see §8).
 - Imports (canonical set):
@@ -116,6 +115,7 @@ Design reference: `new_template.html` (dark glassmorphism). The full layout live
   import QtQuick.Controls 2.15
   import org.kde.plasma.components 3.0 as PlasmaComponents
   import org.kde.plasma.plasmoid 2.0
+  import org.kde.plasma.extras 2.0 as PlasmaExtras
   import org.kde.kirigami 2.20 as Kirigami
   ```
 - Do **not** set `display:` on a textless `ToolButton`.

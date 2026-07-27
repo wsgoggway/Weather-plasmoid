@@ -39,23 +39,17 @@ PlasmaExtras.Representation {
     property bool showError: plasmoidItem ? plasmoidItem._errorMessage.length > 0 : false
     property bool showContent: plasmoidItem && !plasmoidItem._loading && !showError
 
-    // ── dark-glass palette (from new_template.html) ─────────────────────────
-    readonly property color textColor: "#ffffff"
-    readonly property color subtleColor: Qt.rgba(1, 1, 1, 0.6)
-    readonly property color glassColor: Qt.rgba(30/255, 30/255, 40/255, 0.85)
-    readonly property color cardColor: Qt.rgba(1, 1, 1, 0.05)
-    readonly property color dividerColor: Qt.rgba(1, 1, 1, 0.1)
-    readonly property color accentColor: "#3daee9"
+    // ── theme-aware palette (follows the system light/dark theme) ───────────
+    readonly property color textColor: Kirigami.Theme.textColor
+    readonly property color subtleColor: Kirigami.Theme.disabledTextColor
+    readonly property color glassColor: Kirigami.Theme.backgroundColor
+    readonly property color cardColor: Kirigami.Theme.alternateBackgroundColor
+    readonly property color dividerColor: Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g, Kirigami.Theme.textColor.b, 0.12)
+    readonly property color accentColor: Kirigami.Theme.highlightColor
     readonly property color barCold: "#4fc3f7"
     readonly property color barWarm: "#ffb74d"
-    readonly property color negColor: "#ef4f4f"
+    readonly property color negColor: Kirigami.Theme.negativeTextColor
     readonly property int pad: Kirigami.Units.gridUnit * 1.4
-
-    // Plasma/Kirigami controls inside render light-on-dark (inherited by all descendants)
-    Kirigami.Theme.textColor: fullRoot.textColor
-    Kirigami.Theme.disabledTextColor: fullRoot.subtleColor
-    Kirigami.Theme.backgroundColor: "#1e1e28"
-    Kirigami.Theme.highlightColor: fullRoot.accentColor
 
     function forecastMode() { return plasmoid.configuration.forecastMode || "daily" }
     function showDaily()  { return forecastMode() === "daily"  || forecastMode() === "both" }
@@ -371,7 +365,7 @@ PlasmaExtras.Representation {
                             implicitHeight: 6
                             Rectangle {
                                 anchors.fill: parent
-                                color: Qt.rgba(1, 1, 1, 0.1)
+                                color: fullRoot.dividerColor
                                 radius: 3
                             }
                             Rectangle {
