@@ -43,7 +43,7 @@ PlasmaExtras.Representation {
     readonly property color textColor: Kirigami.Theme.textColor
     readonly property color subtleColor: Kirigami.Theme.disabledTextColor
     readonly property color glassColor: Kirigami.Theme.backgroundColor
-    readonly property color cardColor: Kirigami.Theme.alternateBackgroundColor
+    readonly property color cardColor: Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g, Kirigami.Theme.textColor.b, 0.07)
     readonly property color dividerColor: Qt.rgba(Kirigami.Theme.textColor.r, Kirigami.Theme.textColor.g, Kirigami.Theme.textColor.b, 0.12)
     readonly property color accentColor: Kirigami.Theme.highlightColor
     readonly property color barCold: "#4fc3f7"
@@ -292,10 +292,23 @@ PlasmaExtras.Representation {
                          && plasmoidItem && plasmoidItem._hourlyForecasts.length > 0
                 spacing: Kirigami.Units.gridUnit * 0.6
 
-                PlasmaComponents.Label {
-                    text: "Почасовой прогноз"
-                    font.pixelSize: Kirigami.Units.gridUnit * 0.85
-                    color: fullRoot.subtleColor
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: Kirigami.Units.smallSpacing
+                    PlasmaComponents.Label {
+                        text: "Почасовой прогноз"
+                        font.pixelSize: Kirigami.Units.gridUnit * 0.85
+                        color: fullRoot.subtleColor
+                    }
+                    Item { Layout.fillWidth: true }
+                    PlasmaComponents.Label {
+                        // hint: the hourly row scrolls sideways (only when it overflows)
+                        visible: hourlyList.contentWidth > hourlyList.width
+                        text: "листай →"
+                        font.pixelSize: Kirigami.Units.gridUnit * 0.72
+                        font.italic: true
+                        color: fullRoot.subtleColor
+                    }
                 }
                 ListView {
                     id: hourlyList
