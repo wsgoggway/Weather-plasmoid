@@ -256,7 +256,7 @@ If a `Makefile` exists at the project root, these targets should be defined:
 
 Say "done" is ready **only after**:
 
-1. `qmllint package/contents/ui/*.qml` — no errors.
+1. `qmllint package/contents/ui/*.qml` — no errors AND no warnings. **`qmllint` exits 0 even when it prints warnings**, so read its stdout — don't trust the exit code alone.
 2. New/changed API fields verified with `curl` (names + format).
 3. Installed: `./install.sh --user` + `plasmashell --replace &`.
 4. Widget actually opened and tested visually/functionally:
@@ -308,6 +308,7 @@ If a step is not complete, the task is not done — do not say "ready".
 - ❌ Network/parsing logic outside `main.qml`.
 - ❌ Committing without `qmllint` and without testing (§12).
 - ❌ Duplicate `visible:`/property in the same object (even if `qmllint` is silent — the engine will crash).
+- ❌ **Property names beginning with an uppercase letter** (e.g. `RAIN_JOKES`) — the QML engine rejects them with "Property names cannot begin with an upper case letter". Always lowercase (`rainJokes`).
 - ❌ Working directly in `master` or leaving uncommitted changes.
 - ❌ Saying "ready" before passing §12.
 - ❌ Hardcoded UI strings instead of `i18n()`/`i18nc()` calls.

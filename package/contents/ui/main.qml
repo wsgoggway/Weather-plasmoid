@@ -204,12 +204,12 @@ PlasmoidItem {
         if (feelsLike === null || feelsLike === undefined) return ""
         var temp = tempJokes(feelsLike, unitLabel)
         var specials = []
-        if (wmo >= 95) specials = specials.concat(STORM_JOKES)   // thunderstorm first
-        if (isRainy(wmo)) specials = specials.concat(RAIN_JOKES)
-        if (isSnowy(wmo)) specials = specials.concat(SNOW_JOKES)
-        if (isFoggy(wmo)) specials = specials.concat(FOG_JOKES)
-        if (windMs >= 10) specials = specials.concat(WIND_JOKES) // ~strong breeze (36 km/h)
-        if (uv >= 7) specials = specials.concat(UV_JOKES)       // high / very high
+        if (wmo >= 95) specials = specials.concat(stormJokes)   // thunderstorm first
+        if (isRainy(wmo)) specials = specials.concat(rainJokes)
+        if (isSnowy(wmo)) specials = specials.concat(snowJokes)
+        if (isFoggy(wmo)) specials = specials.concat(fogJokes)
+        if (windMs >= 10) specials = specials.concat(windJokes) // ~strong breeze (36 km/h)
+        if (uv >= 7) specials = specials.concat(uvJokes)       // high / very high
         if (specials.length && Math.random() < 0.7) return pickJoke(specials)
         return pickJoke(temp)
     }
@@ -219,34 +219,34 @@ PlasmoidItem {
     function isSnowy(c) { return [71,73,75,77,85,86].indexOf(c) >= 0 }
     function isFoggy(c) { return c === 45 || c === 48 }
 
-    readonly property var RAIN_JOKES: [
+    readonly property var rainJokes: [
         "Дождь. Зонт сегодня не каприз, а средство выживания.",
         "Идеальная погода, чтобы остаться дома. Оправдание есть.",
         "Дождь проверяет твою веру в прогноз — и обычно проигрывает.",
         "Мокро так, что носки предают тебя в первые же минуты."
     ]
-    readonly property var SNOW_JOKES: [
+    readonly property var snowJokes: [
         "Снег. Природа решила, что тебе нужен белый шум в жизни.",
         "Снежинки красивые, пока не станут слякотью под ногами.",
         "Зима вспомнила, что она, вообще-то, зима.",
         "Снег — бесплатный декор за твой счёт (убирать)."
     ]
-    readonly property var STORM_JOKES: [
+    readonly property var stormJokes: [
         "Гроза. Природа устраивает световое шоу за твой счёт.",
         "Молния, гром — природа явно требует внимания.",
         "Гроза: сиди дома и делай вид, что не боишься."
     ]
-    readonly property var FOG_JOKES: [
+    readonly property var fogJokes: [
         "Туман. Видимость ноль — идеально, чтобы не видеть дедлайны.",
         "Туман превращает улицу в декорации к хоррору. Бесплатно."
     ]
-    readonly property var WIND_JOKES: [
+    readonly property var windJokes: [
         "Ветер такой, что идёшь в одну сторону, а несёт в другую.",
         "Шапку держи. Причёску забудь — её уже нет.",
         "Ветер бесплатно делает тебе экспресс-пилинг лица.",
         "Зонты сегодня живут опасно и недолго."
     ]
-    readonly property var UV_JOKES: [
+    readonly property var uvJokes: [
         "Солнце решило, что ты слишком бледный. Намёк понят.",
         "Крем от солнца — не совет, а приказ. Иначе станешь помидором.",
         "УФ такой, что тень официально стала твоим лучшим другом."
