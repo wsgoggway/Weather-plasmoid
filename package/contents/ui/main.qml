@@ -124,7 +124,7 @@ PlasmoidItem {
                 if (xhr.status === 200) {
                     try {
                         var d = JSON.parse(xhr.responseText)
-                        if (d.status === "success" && d.lat && d.lon) {
+                        if (d.status === "success" && d.lat != null && d.lon != null) {
                             writeLocation(d.lat, d.lon, d.city || "", d.timezone || "Europe/Moscow")
                             return
                         }
@@ -436,7 +436,7 @@ PlasmoidItem {
         _currentCloudCover = cur.cloud_cover != null ? cur.cloud_cover : 0
         _currentWindSpeed  = cur.wind_speed_10m != null ? cur.wind_speed_10m : 0
         _currentWindDir    = windDegToCompass(cur.wind_direction_10m != null ? cur.wind_direction_10m : 0)
-        _currentPressure   = cur.pressure_msl ? Math.round(cur.pressure_msl * 0.75006) : 0
+        _currentPressure   = cur.pressure_msl != null ? Math.round(cur.pressure_msl * 0.75006) : 0
 
         var wmo = cur.weather_code != null ? cur.weather_code : 0
         var info = wmoInfo(wmo)
