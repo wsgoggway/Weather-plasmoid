@@ -20,7 +20,7 @@
 
 ## Требования
 
-- **KDE Plasma 6** (или Plasma 5 с `metadata.desktop`)
+- **KDE Plasma 6**
 - Подключение к интернету
 - **Бесплатно** — API-ключ не требуется!
 
@@ -33,6 +33,9 @@
 # Системная установка (требует sudo)
 ./install.sh --system
 ```
+
+Скрипт копирует `package/` в `~/.local/share/plasma/plasmoids/com.github.vladimirm.openmeteo-weather`
+(при `--system` — в `/usr/share/plasma/plasmoids/com.github.vladimirm.openmeteo-weather`).
 
 Перезапустите plasmashell:
 
