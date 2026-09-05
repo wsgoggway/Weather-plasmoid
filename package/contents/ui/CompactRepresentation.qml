@@ -50,9 +50,11 @@ MouseArea {
         text: {
             if (!plasmoidItem) return ""
             if (plasmoidItem._currentConditionRu) {
+                var t = plasmoidItem._currentTemp
+                var f = plasmoidItem._currentFeelsLike
                 return plasmoidItem._currentConditionRu + " — " +
-                       (plasmoidItem._currentTemp || "?") + plasmoidItem._tempUnitLabel +
-                       ", ощущается " + (plasmoidItem._currentFeelsLike || "?") + plasmoidItem._tempUnitLabel
+                       (t === undefined || t === null ? "?" : t) + plasmoidItem._tempUnitLabel +
+                       ", ощущается " + (f === undefined || f === null ? "?" : f) + plasmoidItem._tempUnitLabel
             }
             return plasmoid.configuration.cityName || "Погода"
         }

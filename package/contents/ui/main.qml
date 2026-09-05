@@ -24,6 +24,8 @@ PlasmoidItem {
     property string _lastUpdate: ""
     property string _errorMessage: ""
     property bool _loading: false
+    // Incremented on every fetchWeather() call; stale XHR responses are dropped.
+    property int _fetchSeq: 0
     property string _tempUnitLabel: "°C"
     property string _windUnitLabel: " м/с"
 
@@ -53,19 +55,26 @@ PlasmoidItem {
     }
 
     // ── Timer ────────────────────────────────────────────────────────────────
+    // interval is set imperatively (applyUpdateInterval) — a declarative
+    // binding here would be broken by the assignment in onUpdateIntervalChanged.
     Timer {
         id: _updateTimer
-        interval: Math.max((plasmoid.configuration.updateInterval || 30) * 60 * 1000, 60000)
         repeat: true
         running: true
         triggeredOnStart: true
         onTriggered: fetchWeather()
     }
 
+    function applyUpdateInterval() {
+        _updateTimer.interval = Math.max((plasmoid.configuration.updateInterval || 30) * 60 * 1000, 60000)
+    }
+
+    Component.onCompleted: applyUpdateInterval()
+
     Connections {
         target: plasmoid.configuration
         function onUpdateIntervalChanged() {
-            _updateTimer.interval = Math.max((plasmoid.configuration.updateInterval || 30) * 60 * 1000, 60000)
+            applyUpdateInterval()
             _updateTimer.restart()
         }
         // Re-render on weather-affecting setting change (debounced).
@@ -115,40 +124,43 @@ PlasmoidItem {
     }
 
     // ── Location auto-detect via IP ─────────────────────────────────────────
+    // Primary: ipwhois.app (HTTPS). Fallback: ip-api.com — its free tier is
+    // HTTP-only, kept as the last-resort fallback.
     function detectLocation() {
         var xhr = new XMLHttpRequest()
-        xhr.open("GET", "http://ip-api.com/json/?fields=status,message,country,city,lat,lon,timezone")
+        xhr.open("GET", "https://ipwhois.app/json/")
         xhr.timeout = 8000
         xhr.onreadystatechange = function() {
             if (xhr.readyState === XMLHttpRequest.DONE) {
                 if (xhr.status === 200) {
                     try {
                         var d = JSON.parse(xhr.responseText)
-                        if (d.status === "success" && d.lat && d.lon) {
-                            writeLocation(d.lat, d.lon, d.city || "", d.timezone || "Europe/Moscow")
+                        if (d.success !== false && d.latitude != null && d.longitude != null) {
+                            writeLocation(d.latitude, d.longitude,
+                                d.city || d.region || "", d.timezone || "Europe/Moscow")
                             return
                         }
                     } catch (e) {}
                 }
-                tryFallbackIpwhois()
+                tryFallbackIpApi()
             }
         }
-        xhr.ontimeout = function() { tryFallbackIpwhois() }
-        xhr.onerror   = function() { tryFallbackIpwhois() }
+        xhr.ontimeout = function() { tryFallbackIpApi() }
+        xhr.onerror   = function() { tryFallbackIpApi() }
         xhr.send()
     }
 
-    function tryFallbackIpwhois() {
+    function tryFallbackIpApi() {
         var xhr = new XMLHttpRequest()
-        xhr.open("GET", "https://ipwhois.app/json/")
+        // ip-api.com free tier is HTTP-only (no HTTPS) — kept as last-resort fallback
+        xhr.open("GET", "http://ip-api.com/json/?fields=status,message,country,city,lat,lon,timezone")
         xhr.timeout = 8000
         xhr.onreadystatechange = function() {
             if (xhr.readyState === XMLHttpRequest.DONE && xhr.status === 200) {
                 try {
                     var d = JSON.parse(xhr.responseText)
-                    if (d.success !== false && d.latitude && d.longitude) {
-                        writeLocation(d.latitude, d.longitude,
-                            d.city || d.region || "", d.timezone || "Europe/Moscow")
+                    if (d.status === "success" && d.lat != null && d.lon != null) {
+                        writeLocation(d.lat, d.lon, d.city || "", d.timezone || "Europe/Moscow")
                         return
                     }
                 } catch (e) {}
@@ -164,7 +176,11 @@ PlasmoidItem {
         plasmoid.configuration.longitude = lon
         plasmoid.configuration.cityName  = city || ""
         plasmoid.configuration.timezone  = tz || "Europe/Moscow"
-        fetchWeather()
+        // Debounce instead of fetching directly: these config writes also fire
+        // the Connections handlers → _configReloadTimer, so a direct call here
+        // would double-fetch. The restart guarantees exactly one fetch, even
+        // when values are unchanged and no Changed signal fires.
+        _configReloadTimer.restart()
     }
 
     // ── Wind: degrees → Russian compass ─────────────────────────────────────
@@ -358,6 +374,8 @@ PlasmoidItem {
 
     // ── Fetch from Open-Meteo ───────────────────────────────────────────────
     function fetchWeather() {
+        root._fetchSeq++
+        var seq = root._fetchSeq
         _loading = true
         _errorMessage = ""
 
@@ -406,6 +424,7 @@ PlasmoidItem {
         xhr.timeout = 15000
         xhr.onreadystatechange = function() {
             if (xhr.readyState === XMLHttpRequest.DONE) {
+                if (seq !== root._fetchSeq) return // stale response — a newer request owns the state
                 _loading = false
                 if (xhr.status === 200) {
                     try {
@@ -422,8 +441,14 @@ PlasmoidItem {
                 }
             }
         }
-        xhr.ontimeout = function() { _loading = false; _errorMessage = "Таймаут запроса" }
-        xhr.onerror   = function() { _loading = false; _errorMessage = "Ошибка сети" }
+        xhr.ontimeout = function() {
+            if (seq !== root._fetchSeq) return
+            _loading = false; _errorMessage = "Таймаут запроса"
+        }
+        xhr.onerror   = function() {
+            if (seq !== root._fetchSeq) return
+            _loading = false; _errorMessage = "Ошибка сети"
+        }
         xhr.send()
     }
 
@@ -436,7 +461,7 @@ PlasmoidItem {
         _currentCloudCover = cur.cloud_cover != null ? cur.cloud_cover : 0
         _currentWindSpeed  = cur.wind_speed_10m != null ? cur.wind_speed_10m : 0
         _currentWindDir    = windDegToCompass(cur.wind_direction_10m != null ? cur.wind_direction_10m : 0)
-        _currentPressure   = cur.pressure_msl ? Math.round(cur.pressure_msl * 0.75006) : 0
+        _currentPressure   = cur.pressure_msl != null ? Math.round(cur.pressure_msl * 0.75006) : 0
 
         var wmo = cur.weather_code != null ? cur.weather_code : 0
         var info = wmoInfo(wmo)

@@ -128,7 +128,8 @@ PlasmaExtras.Representation {
                         var city = plasmoid.configuration.cityName
                         if (city && plasmoidItem)
                             plasmoidItem.geocodeCity(city, function(lat, lon, name, tz) {
-                                if (lat) plasmoidItem.writeLocation(lat, lon, name, tz)
+                                if (lat != null && lon != null)
+                                    plasmoidItem.writeLocation(lat, lon, name, tz)
                             })
                     }
                     PlasmaComponents.ToolTip { text: "Найти координаты по городу" }

@@ -10,7 +10,7 @@ All identifiers/code are in English; descriptions are now in English as well.
 - A **Plasma 6 plasmoid (applet)** using `KPackageStructure: Plasma/Applet`.
 - Id: `com.github.vladimirm.openmeteo-weather`.
 - **No C++/Python/compilation.** Only QML + JavaScript + JSON metadata.
-- Weather source: **Open-Meteo** (no key). City geocoding — Open-Meteo Geocoding, IP geolocation — ip-api/ipwhois.
+- Weather source: **Open-Meteo** (no key). City geocoding — Open-Meteo Geocoding, IP geolocation — ipwhois.app (HTTPS), fallback ip-api.com (HTTP).
 
 ---
 
@@ -30,10 +30,6 @@ package/
     ├── config/
     │   ├── config.qml            # ConfigModel → one category "General"
     │   └── main.xml              # KConfig XT schema (types + defaults)
-    └── locale/                   # i18n: .po files, one per language
-        └── ru/
-            └── LC_MESSAGES/
-                └── plasmoid_com.github.vladimirm.openmeteo-weather.po
 install.sh                        # copies package/ into plasma/plasmoids/<Id>
 ```
 
@@ -80,7 +76,7 @@ In `configGeneral.qml`:
 - Allowed sources:
   - `api.open-meteo.com/v1/forecast` — weather
   - `geocoding-api.open-meteo.com/v1/search` — city → coordinates
-  - `ip-api.com/json/` (http) + `ipwhois.app/json/` (fallback) — IP geolocation
+  - `ipwhois.app/json/` (https, primary) + `ip-api.com/json/` (http, last-resort fallback — free tier has no HTTPS) — IP geolocation
 - Before using a new API field, **verify the exact name and format with `curl`** (e.g., `uv_index_max`, `precipitation_sum`).
 
 ---
@@ -107,7 +103,7 @@ Design: theme-aware (adapts to the system light/dark theme). The full layout liv
 - **temp-bar**: a `dividerColor` track 6px tall + a `Gradient.Horizontal #4fc3f7→#ffb74d` fill; its position/width are fractions of `(t_min−weekMin)/(weekMax−weekMin)`, where `weekMin`/`weekMax` are computed across all forecast days.
 - `ForecastItem` is hourly-only (plain, no card background; theme-aware colors).
 - Sizing via `Kirigami.Units.gridUnit`; spacing via `largeSpacing`/`smallSpacing`.
-- All user-visible label/value strings use `i18n()` (see §8).
+- All user-visible label/value strings are hardcoded Russian (see §8).
 - Imports (canonical set):
   ```
   import QtQuick 2.15
@@ -131,41 +127,13 @@ Design: theme-aware (adapts to the system light/dark theme). The full layout liv
 
 ---
 
-## 8. Internationalization (i18n)
+## 8. Language of UI Strings
 
-- The UI language follows the system locale. All user-visible strings must use KDE i18n functions.
-- `i18n("string")` — plain string.
-- `i18nc("context", "string")` — when the same English text needs different translations depending on context.
-- `i18np("singular", "plural", n)` — plural forms.
-- Hardcoded UI strings are **forbidden**. Every label, tooltip, error message, and unit label must be an `i18n()` call.
-- Code-level identifiers, API field names, and debug logs remain in English.
-- All `_`-prefixed state properties that hold display strings (like `_currentConditionRu`) must be renamed to locale-agnostic names and populated from `i18n()` calls.
-
-**How it works in practice:**
-- Source strings in `i18n(...)` are in **English**.
-- Translations live in `.po` files under `contents/locale/<lang>/LC_MESSAGES/`.
-- Plasma loads the correct `.mo` file at runtime based on the system language.
-- The default (`en`) strings are the English `msgid` values in code — no `.po` needed for English.
-
-### Strings that need `i18n()`
-
-| Category | Example |
-|---|---|
-| WMO weather descriptions | `i18n("Clear")`, `i18n("Rain")` |
-| Compass directions | `i18nc("wind direction", "N")`, `i18nc("wind direction", "NE")` |
-| UI labels | `i18n("Wind")`, `i18n("Humidity")`, `i18n("Pressure")` |
-| Unit labels | `i18nc("wind speed", "m/s")`, `i18nc("temperature", "°C")` |
-| Error messages | `i18n("Network error")`, `i18n("HTTP error %1").arg(status)` |
-| Feels-like jokes | `i18n("Put on a hat. Mom is watching, implicitly.")` |
-| Settings labels | `i18n("Update interval (min):")` |
-| Forecast labels | `i18n("Daily")`, `i18n("Hourly")`, `i18n("Now")` |
-
-### Parameters
-
-Use `%1`, `%2` etc. for dynamic values:
-```qml
-i18n("Feels like %1%2").arg(feelsLike).arg(tempUnitLabel)
-```
+- The widget is **single-language**: all user-visible strings are **hardcoded Russian** by design. This is intentional, not an oversight.
+- `i18n()` / `i18nc()` / `i18nd()` calls are **NOT used** anywhere in the code.
+- There is **no locale pipeline**: no `contents/locale/` directory, no `.po`/`.pot`/`.mo` files, and `install.sh` does not run `msgfmt`.
+- Do not add `i18n()` calls or a `locale/` directory piecemeal. Migrating to KDE i18n is **future work** and must be a dedicated task: extract all strings, set up the `.po` files and the build/install step, then rewrite this section.
+- Until then, keep new user-visible strings hardcoded Russian, consistent with the rest of the UI.
 
 ---
 
@@ -186,62 +154,17 @@ i18n("Feels like %1%2").arg(feelsLike).arg(tempUnitLabel)
 - Merge into `master` **only after** passing lint and tests (see §10).
 - If a remote exists, `git push` after merging.
 
-## 10. Translation Workflow
+## 10. Localization (Future Work)
 
-### Directory structure
+There is currently **no translation pipeline**: no `contents/locale/` directory, no `.po`/`.pot` files, and `install.sh` does **not** compile anything with `msgfmt` — it only copies `package/` into the plasma plasmoids directory. UI strings are hardcoded Russian (see §8).
 
-```
-package/contents/locale/
-├── ru/
-│   └── LC_MESSAGES/
-│       └── plasmoid_com.github.vladimirm.openmeteo-weather.po
-├── de/
-│   └── LC_MESSAGES/
-│       └── plasmoid_com.github.vladimirm.openmeteo-weather.po
-└── …
-```
+If localization is ever added, it must include:
+1. Replacing all hardcoded strings with `i18n()`/`i18nc()` calls.
+2. A `package/contents/locale/<lang>/LC_MESSAGES/plasmoid_<applet-id>.po` layout.
+3. String extraction (`xgettext`) and `.po` → `.mo` compilation (`msgfmt`) wired into `install.sh`.
+4. An update of this document.
 
-Each `.po` file is a gettext translation file. The filename follows the pattern `plasmoid_<applet-id>.po`.
-
-### Updating translations
-
-When new `i18n()` calls are added or existing ones change:
-
-1. **Extract** new strings into the template:
-   ```bash
-   xgettext -L JavaScript -o po/template.pot package/contents/ui/*.qml \
-     --keyword=i18n --keyword=i18nc:1c,2 --keyword=i18np:1,2
-   ```
-2. **Merge** into each language `.po`:
-   ```bash
-   msgmerge -U package/contents/locale/ru/LC_MESSAGES/plasmoid_com.github.vladimirm.openmeteo-weather.po po/template.pot
-   ```
-3. **Fill in** translations for new `msgid` entries in each `.po` file.
-4. **Compile** `.po` → `.mo` for runtime:
-   ```bash
-   msgfmt -o package/contents/locale/ru/LC_MESSAGES/plasmoid_com.github.vladimirm.openmeteo-weather.mo \
-            package/contents/locale/ru/LC_MESSAGES/plasmoid_com.github.vladimirm.openmeteo-weather.po
-   ```
-   The `install.sh` script does this automatically.
-
-### Rules
-
-- Never edit `.mo` files directly — always edit `.po` and recompile.
-- Keep `.po` files committed in the repository.
-- Add `po/template.pot` to the repository for CI/contributor workflows.
-- When adding a new language, create a new directory `contents/locale/<lang>/LC_MESSAGES/` with the `.po` file.
-- Always update translations **in the same commit** that adds/changes the source strings.
-- If a translation is missing for a string, Plasma falls back to the English `msgid` — acceptable temporarily, but fill in missing translations before release.
-
-### `Makefile` targets (optional, for convenience)
-
-If a `Makefile` exists at the project root, these targets should be defined:
-
-| Target | Action |
-|---|---|
-| `make pot` | Extract strings → `po/template.pot` |
-| `make po`  | Merge `po/template.pot` into all `.po` files |
-| `make mo`  | Compile all `.po` → `.mo` in `contents/locale/` |
+Until then, do not expect — or "restore" — the locale pipeline in audits: it does not exist.
 
 ## 11. Documentation (Keep in Sync)
 
@@ -249,7 +172,7 @@ If a `Makefile` exists at the project root, these targets should be defined:
   - `README.md` — user-facing features, settings, list of metrics;
   - `AGENT.md` — if conventions, API, structure, or workflow change.
 - New settings — mention in README (section "Settings") and in §12.
-- New or changed translatable strings — update `.po` files (see §10).
+- New or changed user-visible strings stay hardcoded Russian (see §8) — there is no `.po` pipeline to update yet.
 - Do not let code and docs drift out of sync: both describe the same state.
 
 ## 12. Definition of Done — Before Saying "It's Ready"
@@ -266,8 +189,7 @@ Say "done" is ready **only after**:
    - unit switching (°C/°F, wind units) — no artifacts;
    - on network error — error card with "Retry" button.
 5. Documentation updated (§11).
-6. `.po` files updated, translations filled, `.mo` compiled (see §10).
-7. Changes committed and merged into `master` (§9).
+6. Changes committed and merged into `master` (§9).
 
 If a step is not complete, the task is not done — do not say "ready".
 
@@ -277,10 +199,9 @@ If a step is not complete, the task is not done — do not say "ready".
 - [ ] No hardcoded colors outside the theme; no `onValueChanged`/`onCheckedChanged` for `cfg_*`.
 - [ ] New state properties declared on the `main.qml` root with `_` prefix and populated in `parseOpenMeteo`.
 - [ ] Rounding/formatting done at source, not in UI.
-- [ ] All user-visible strings use `i18n()`/`i18nc()` instead of hardcoded text.
+- [ ] User-visible strings are hardcoded Russian (single-language widget; see §8 — no i18n yet).
 - [ ] Network: `timeout`/`ontimeout`/`onerror` present; free API without key.
 - [ ] New settings have 1:1 mapping `main.xml` ↔ `cfg_*`.
-- [ ] `.po` files updated, translations filled, `.mo` compiled.
 - [ ] README/AGENT updated.
 - [ ] Tests per §12 passed.
 
@@ -290,13 +211,12 @@ If a step is not complete, the task is not done — do not say "ready".
 2. **`contents/ui/configGeneral.qml`**:
    - declare `property var cfg_<name>` and `property var cfg_<name>Default`;
    - add a control following §2 rules (direct binding + user-initiated signal);
-   - use `i18n()` for all user-visible strings (labels, button text, tooltips).
+   - use hardcoded Russian for all user-visible strings (labels, button text, tooltips) — see §8.
 3. **`contents/ui/main.qml`** — read `plasmoid.configuration.<name>` (with `|| default` fallback), use in logic.
-4. If needed, add a UI element in `FullRepresentation.qml` (use `i18n()` for strings).
+4. If needed, add a UI element in `FullRepresentation.qml` (hardcoded Russian strings, see §8).
 5. **Test**: reinstall the package and **re-create the widget** (otherwise the new `main.xml` schema may not be picked up), check save/restore.
 6. Update README (section "Settings").
-7. Update `.po` files (extract + translate + compile, see §10).
-8. Commit + merge per §9.
+7. Commit + merge per §9.
 
 ## 15. Anti-Patterns
 
@@ -311,22 +231,14 @@ If a step is not complete, the task is not done — do not say "ready".
 - ❌ **Property names beginning with an uppercase letter** (e.g. `RAIN_JOKES`) — the QML engine rejects them with "Property names cannot begin with an upper case letter". Always lowercase (`rainJokes`).
 - ❌ Working directly in `master` or leaving uncommitted changes.
 - ❌ Saying "ready" before passing §12.
-- ❌ Hardcoded UI strings instead of `i18n()`/`i18nc()` calls.
-- ❌ `.po` files out of sync with code (missing strings or stale translations).
-- ❌ Mixing `i18n()` and non-`i18n()` strings in the same UI element.
-- ❌ Editing `.mo` files directly (edit `.po` and recompile).
-- ❌ Adding new `i18n()` strings without updating `.po` files in the same commit.
+- ❌ Mixing `i18n()` calls into the hardcoded-Russian UI — i18n is not used at all yet (see §8).
 
 ## 16. Useful Commands
 
 ```bash
 qmllint package/contents/ui/*.qml                      # syntax check
-./install.sh --user                                    # user-local install (compiles .mo too)
+./install.sh --user                                    # user-local install (copies package/)
 plasmashell --replace &                                # restart shell
-make pot                                                # extract strings → po/template.pot
-make po                                                 # merge into existing .po files
-msgfmt -o package/contents/locale/ru/LC_MESSAGES/plasmoid_com.github.vladimirm.openmeteo-weather.mo \
-         package/contents/locale/ru/LC_MESSAGES/plasmoid_com.github.vladimirm.openmeteo-weather.po
 git checkout -b feat/<name>                            # branch for a task
 git add -A && git commit -m "feat: …"                  # commit
 git checkout master && git merge --no-ff feat/<name>   # merge into master
