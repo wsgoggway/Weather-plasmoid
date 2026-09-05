@@ -24,6 +24,8 @@ PlasmoidItem {
     property string _lastUpdate: ""
     property string _errorMessage: ""
     property bool _loading: false
+    // Incremented on every fetchWeather() call; stale XHR responses are dropped.
+    property int _fetchSeq: 0
     property string _tempUnitLabel: "°C"
     property string _windUnitLabel: " м/с"
 
@@ -164,7 +166,11 @@ PlasmoidItem {
         plasmoid.configuration.longitude = lon
         plasmoid.configuration.cityName  = city || ""
         plasmoid.configuration.timezone  = tz || "Europe/Moscow"
-        fetchWeather()
+        // Debounce instead of fetching directly: these config writes also fire
+        // the Connections handlers → _configReloadTimer, so a direct call here
+        // would double-fetch. The restart guarantees exactly one fetch, even
+        // when values are unchanged and no Changed signal fires.
+        _configReloadTimer.restart()
     }
 
     // ── Wind: degrees → Russian compass ─────────────────────────────────────
@@ -358,6 +364,8 @@ PlasmoidItem {
 
     // ── Fetch from Open-Meteo ───────────────────────────────────────────────
     function fetchWeather() {
+        root._fetchSeq++
+        var seq = root._fetchSeq
         _loading = true
         _errorMessage = ""
 
@@ -406,6 +414,7 @@ PlasmoidItem {
         xhr.timeout = 15000
         xhr.onreadystatechange = function() {
             if (xhr.readyState === XMLHttpRequest.DONE) {
+                if (seq !== root._fetchSeq) return // stale response — a newer request owns the state
                 _loading = false
                 if (xhr.status === 200) {
                     try {
@@ -422,8 +431,14 @@ PlasmoidItem {
                 }
             }
         }
-        xhr.ontimeout = function() { _loading = false; _errorMessage = "Таймаут запроса" }
-        xhr.onerror   = function() { _loading = false; _errorMessage = "Ошибка сети" }
+        xhr.ontimeout = function() {
+            if (seq !== root._fetchSeq) return
+            _loading = false; _errorMessage = "Таймаут запроса"
+        }
+        xhr.onerror   = function() {
+            if (seq !== root._fetchSeq) return
+            _loading = false; _errorMessage = "Ошибка сети"
+        }
         xhr.send()
     }
 
