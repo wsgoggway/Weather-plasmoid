@@ -121,7 +121,8 @@ KCM.SimpleKCM {
         xhr.open("GET", "http://ip-api.com/json/?fields=status,message,country,city,lat,lon,timezone")
         xhr.timeout = 8000
         xhr.onreadystatechange = function() {
-            if (xhr.readyState === XMLHttpRequest.DONE && xhr.status === 200) {
+            if (xhr.readyState !== XMLHttpRequest.DONE) return
+            if (xhr.status === 200) {
                 try {
                     var d = JSON.parse(xhr.responseText)
                     if (d.status === "success" && d.lat != null && d.lon != null) {
