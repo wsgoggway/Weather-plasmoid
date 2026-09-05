@@ -10,7 +10,7 @@ All identifiers/code are in English; descriptions are now in English as well.
 - A **Plasma 6 plasmoid (applet)** using `KPackageStructure: Plasma/Applet`.
 - Id: `com.github.vladimirm.openmeteo-weather`.
 - **No C++/Python/compilation.** Only QML + JavaScript + JSON metadata.
-- Weather source: **Open-Meteo** (no key). City geocoding — Open-Meteo Geocoding, IP geolocation — ip-api/ipwhois.
+- Weather source: **Open-Meteo** (no key). City geocoding — Open-Meteo Geocoding, IP geolocation — ipwhois.app (HTTPS), fallback ip-api.com (HTTP).
 
 ---
 
@@ -80,7 +80,7 @@ In `configGeneral.qml`:
 - Allowed sources:
   - `api.open-meteo.com/v1/forecast` — weather
   - `geocoding-api.open-meteo.com/v1/search` — city → coordinates
-  - `ip-api.com/json/` (http) + `ipwhois.app/json/` (fallback) — IP geolocation
+  - `ipwhois.app/json/` (https, primary) + `ip-api.com/json/` (http, last-resort fallback — free tier has no HTTPS) — IP geolocation
 - Before using a new API field, **verify the exact name and format with `curl`** (e.g., `uv_index_max`, `precipitation_sum`).
 
 ---

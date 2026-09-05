@@ -55,19 +55,26 @@ PlasmoidItem {
     }
 
     // ── Timer ────────────────────────────────────────────────────────────────
+    // interval is set imperatively (applyUpdateInterval) — a declarative
+    // binding here would be broken by the assignment in onUpdateIntervalChanged.
     Timer {
         id: _updateTimer
-        interval: Math.max((plasmoid.configuration.updateInterval || 30) * 60 * 1000, 60000)
         repeat: true
         running: true
         triggeredOnStart: true
         onTriggered: fetchWeather()
     }
 
+    function applyUpdateInterval() {
+        _updateTimer.interval = Math.max((plasmoid.configuration.updateInterval || 30) * 60 * 1000, 60000)
+    }
+
+    Component.onCompleted: applyUpdateInterval()
+
     Connections {
         target: plasmoid.configuration
         function onUpdateIntervalChanged() {
-            _updateTimer.interval = Math.max((plasmoid.configuration.updateInterval || 30) * 60 * 1000, 60000)
+            applyUpdateInterval()
             _updateTimer.restart()
         }
         // Re-render on weather-affecting setting change (debounced).
@@ -117,40 +124,43 @@ PlasmoidItem {
     }
 
     // ── Location auto-detect via IP ─────────────────────────────────────────
+    // Primary: ipwhois.app (HTTPS). Fallback: ip-api.com — its free tier is
+    // HTTP-only, kept as the last-resort fallback.
     function detectLocation() {
         var xhr = new XMLHttpRequest()
-        xhr.open("GET", "http://ip-api.com/json/?fields=status,message,country,city,lat,lon,timezone")
+        xhr.open("GET", "https://ipwhois.app/json/")
         xhr.timeout = 8000
         xhr.onreadystatechange = function() {
             if (xhr.readyState === XMLHttpRequest.DONE) {
                 if (xhr.status === 200) {
                     try {
                         var d = JSON.parse(xhr.responseText)
-                        if (d.status === "success" && d.lat != null && d.lon != null) {
-                            writeLocation(d.lat, d.lon, d.city || "", d.timezone || "Europe/Moscow")
+                        if (d.success !== false && d.latitude != null && d.longitude != null) {
+                            writeLocation(d.latitude, d.longitude,
+                                d.city || d.region || "", d.timezone || "Europe/Moscow")
                             return
                         }
                     } catch (e) {}
                 }
-                tryFallbackIpwhois()
+                tryFallbackIpApi()
             }
         }
-        xhr.ontimeout = function() { tryFallbackIpwhois() }
-        xhr.onerror   = function() { tryFallbackIpwhois() }
+        xhr.ontimeout = function() { tryFallbackIpApi() }
+        xhr.onerror   = function() { tryFallbackIpApi() }
         xhr.send()
     }
 
-    function tryFallbackIpwhois() {
+    function tryFallbackIpApi() {
         var xhr = new XMLHttpRequest()
-        xhr.open("GET", "https://ipwhois.app/json/")
+        // ip-api.com free tier is HTTP-only (no HTTPS) — kept as last-resort fallback
+        xhr.open("GET", "http://ip-api.com/json/?fields=status,message,country,city,lat,lon,timezone")
         xhr.timeout = 8000
         xhr.onreadystatechange = function() {
             if (xhr.readyState === XMLHttpRequest.DONE && xhr.status === 200) {
                 try {
                     var d = JSON.parse(xhr.responseText)
-                    if (d.success !== false && d.latitude && d.longitude) {
-                        writeLocation(d.latitude, d.longitude,
-                            d.city || d.region || "", d.timezone || "Europe/Moscow")
+                    if (d.status === "success" && d.lat != null && d.lon != null) {
+                        writeLocation(d.lat, d.lon, d.city || "", d.timezone || "Europe/Moscow")
                         return
                     }
                 } catch (e) {}

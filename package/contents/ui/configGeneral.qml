@@ -52,7 +52,8 @@ KCM.SimpleKCM {
             encodeURIComponent(cityName) + "&count=1&language=ru")
         xhr.timeout = 8000
         xhr.onreadystatechange = function() {
-            if (xhr.readyState === XMLHttpRequest.DONE && xhr.status === 200) {
+            if (xhr.readyState !== XMLHttpRequest.DONE) return
+            if (xhr.status === 200) {
                 try {
                     var data = JSON.parse(xhr.responseText)
                     if (data.results && data.results.length > 0) {
@@ -69,53 +70,62 @@ KCM.SimpleKCM {
                         geocodeBtn.text = "✓ Найдено: " + cfg_cityName
                         return
                     }
-                } catch (e) {}
+                    geocodeBtn.enabled = true
+                    geocodeBtn.text = "✗ Город не найден"
+                } catch (e) {
+                    geocodeBtn.enabled = true
+                    geocodeBtn.text = "✗ Ошибка сервиса геокодирования (код " + xhr.status + ")"
+                }
+                return
             }
             geocodeBtn.enabled = true
-            geocodeBtn.text = "✗ Город не найден"
+            geocodeBtn.text = "✗ Ошибка сервиса геокодирования (код " + xhr.status + ")"
         }
         xhr.ontimeout = function() { geocodeBtn.enabled = true; geocodeBtn.text = "✗ Таймаут" }
         xhr.onerror   = function() { geocodeBtn.enabled = true; geocodeBtn.text = "✗ Нет интернета" }
         xhr.send()
     }
 
-    // ── Detect location via IP (same reliable APIs as the widget) ──────────
+    // ── Detect location via IP ──────────────────────────────────────────────
+    // Primary: ipwhois.app (HTTPS). Fallback: ip-api.com — its free tier is
+    // HTTP-only, kept as the last-resort fallback.
     function detectLocation() {
         detectBtn.enabled = false
         detectBtn.text = "Определяю..."
         var xhr = new XMLHttpRequest()
-        xhr.open("GET", "http://ip-api.com/json/?fields=status,message,country,city,lat,lon,timezone")
+        xhr.open("GET", "https://ipwhois.app/json/")
         xhr.timeout = 8000
         xhr.onreadystatechange = function() {
             if (xhr.readyState === XMLHttpRequest.DONE) {
                 if (xhr.status === 200) {
                     try {
                         var d = JSON.parse(xhr.responseText)
-                        if (d.status === "success" && d.lat && d.lon) {
-                            writeDetectedLocation(d.lat, d.lon, d.city || "", d.timezone || "Europe/Moscow")
+                        if (d.success !== false && d.latitude != null && d.longitude != null) {
+                            writeDetectedLocation(d.latitude, d.longitude,
+                                d.city || d.region || "", d.timezone || "Europe/Moscow")
                             return
                         }
                     } catch (e) {}
                 }
-                tryFallbackDetect()
+                tryFallbackIpApi()
             }
         }
-        xhr.ontimeout = function() { tryFallbackDetect() }
-        xhr.onerror   = function() { tryFallbackDetect() }
+        xhr.ontimeout = function() { tryFallbackIpApi() }
+        xhr.onerror   = function() { tryFallbackIpApi() }
         xhr.send()
     }
 
-    function tryFallbackDetect() {
+    function tryFallbackIpApi() {
         var xhr = new XMLHttpRequest()
-        xhr.open("GET", "https://ipwhois.app/json/")
+        // ip-api.com free tier is HTTP-only (no HTTPS) — kept as last-resort fallback
+        xhr.open("GET", "http://ip-api.com/json/?fields=status,message,country,city,lat,lon,timezone")
         xhr.timeout = 8000
         xhr.onreadystatechange = function() {
             if (xhr.readyState === XMLHttpRequest.DONE && xhr.status === 200) {
                 try {
                     var d = JSON.parse(xhr.responseText)
-                    if (d.success !== false && d.latitude && d.longitude) {
-                        writeDetectedLocation(d.latitude, d.longitude,
-                            d.city || d.region || "", d.timezone || "Europe/Moscow")
+                    if (d.status === "success" && d.lat != null && d.lon != null) {
+                        writeDetectedLocation(d.lat, d.lon, d.city || "", d.timezone || "Europe/Moscow")
                         return
                     }
                 } catch (e) {}

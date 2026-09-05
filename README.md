@@ -92,7 +92,7 @@ kde_ya_wether/
 ## Источники данных
 
 - **Погода и геокодинг городов:** [Open-Meteo](https://open-meteo.com) (без ключа, CC BY 4.0)
-- **Геолокация по IP:** ip-api.com (фолбэк — ipwhois.app)
+- **Геолокация по IP:** ipwhois.app (HTTPS; фолбэк — ip-api.com, у бесплатного тарифа нет HTTPS)
 
 ## Open-Meteo API
 
