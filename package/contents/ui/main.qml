@@ -16,9 +16,11 @@ PlasmoidItem {
     property string _currentEmoji: "🌈"
     property double _currentWindSpeed: 0
     property string _currentWindDir: ""
+    property double _currentGusts: 0
     property double _currentHumidity: 0
     property double _currentPressure: 0
     property double _currentCloudCover: 0
+    property double _currentDewPoint: 0
     property var _forecasts: []
     property var _hourlyForecasts: []
     property string _lastUpdate: ""
@@ -36,6 +38,25 @@ PlasmoidItem {
     property double _precipSum: 0
     property string _feelsJokeText: ""
 
+    // ── Air quality (European AQI; Air Quality API) ─────────────────────────
+    // _aqiText is preformatted ("61 · Плохое"); empty means "no data — hide card".
+    // _aqiLevel: 0 = good/fair, 1 = moderate, 2 = poor+ (drives the dot color).
+    property string _aqiText: ""
+    property int _aqiLevel: -1
+    property int _aqSeq: 0
+
+    // Transient one-line notice under the header (e.g. "Город не найден").
+    property string _noticeText: ""
+    function showNotice(msg) {
+        _noticeText = msg
+        _noticeTimer.restart()
+    }
+    Timer {
+        id: _noticeTimer
+        interval: 4000
+        onTriggered: root._noticeText = ""
+    }
+
     // ── Layout ──────────────────────────────────────────────────────────────
     switchWidth: Kirigami.Units.gridUnit * 12
     switchHeight: Kirigami.Units.gridUnit * 14
@@ -45,7 +66,8 @@ PlasmoidItem {
 
     // ── Tooltip ─────────────────────────────────────────────────────────────
     toolTipMainText: {
-        if (_currentConditionRu && _currentTemp !== undefined) {
+        // Before the first successful fetch the zeros are placeholders, not data
+        if (_lastUpdate !== "" && _currentConditionRu) {
             return _currentConditionRu + " — " +
                    _currentTemp + _tempUnitLabel +
                    ", ощущается " + _currentFeelsLike + _tempUnitLabel +
@@ -156,18 +178,21 @@ PlasmoidItem {
         xhr.open("GET", "http://ip-api.com/json/?fields=status,message,country,city,lat,lon,timezone")
         xhr.timeout = 8000
         xhr.onreadystatechange = function() {
-            if (xhr.readyState === XMLHttpRequest.DONE && xhr.status === 200) {
-                try {
-                    var d = JSON.parse(xhr.responseText)
-                    if (d.status === "success" && d.lat != null && d.lon != null) {
-                        writeLocation(d.lat, d.lon, d.city || "", d.timezone || "Europe/Moscow")
-                        return
-                    }
-                } catch (e) {}
+            if (xhr.readyState === XMLHttpRequest.DONE) {
+                if (xhr.status === 200) {
+                    try {
+                        var d = JSON.parse(xhr.responseText)
+                        if (d.status === "success" && d.lat != null && d.lon != null) {
+                            writeLocation(d.lat, d.lon, d.city || "", d.timezone || "Europe/Moscow")
+                            return
+                        }
+                    } catch (e) {}
+                }
+                showNotice("✗ Не удалось определить местоположение")
             }
         }
-        xhr.ontimeout = function() {}
-        xhr.onerror   = function() {}
+        xhr.ontimeout = function() { showNotice("✗ Не удалось определить местоположение") }
+        xhr.onerror   = function() { showNotice("✗ Не удалось определить местоположение") }
         xhr.send()
     }
 
@@ -360,6 +385,11 @@ PlasmoidItem {
     }
 
     // ── Small format helpers ────────────────────────────────────────────────
+    // null/undefined/NaN → default; keeps 0, which is a valid coordinate
+    // (unlike "x || default", which used to send lat/lon 0 to Moscow)
+    function numOr(v, d) {
+        return (v === null || v === undefined || isNaN(v)) ? d : v
+    }
     function isoToHM(iso) {
         if (!iso) return "--:--"
         var t = iso.split("T")[1]
@@ -379,8 +409,8 @@ PlasmoidItem {
         _loading = true
         _errorMessage = ""
 
-        var lat = plasmoid.configuration.latitude || 55.7558
-        var lon = plasmoid.configuration.longitude || 37.6173
+        var lat = numOr(plasmoid.configuration.latitude, 55.7558)
+        var lon = numOr(plasmoid.configuration.longitude, 37.6173)
         var tz  = plasmoid.configuration.timezone || "Europe/Moscow"
         var days = plasmoid.configuration.showForecast ? (plasmoid.configuration.forecastDays || 7) : 1
         var tempUnit = plasmoid.configuration.temperatureUnit || "celsius"
@@ -398,7 +428,8 @@ PlasmoidItem {
         var url = "https://api.open-meteo.com/v1/forecast" +
             "?latitude=" + lat + "&longitude=" + lon +
             "&current=temperature_2m,relative_humidity_2m,apparent_temperature," +
-            "weather_code,wind_speed_10m,wind_direction_10m,pressure_msl,cloud_cover"
+            "weather_code,wind_speed_10m,wind_gusts_10m,wind_direction_10m," +
+            "pressure_msl,cloud_cover,dew_point_2m,is_day"
 
         // Day-summary metrics (sunrise/sunset/uv/precip) are always requested —
         // they feed the "Day" card regardless of forecast mode.
@@ -418,6 +449,9 @@ PlasmoidItem {
             "&forecast_days=" + days +
             "&temperature_unit=" + tempUnit +
             "&wind_speed_unit=" + windUnit
+
+        // Independent request — air quality card just hides on failure
+        fetchAirQuality(lat, lon)
 
         var xhr = new XMLHttpRequest()
         xhr.open("GET", url)
@@ -452,6 +486,46 @@ PlasmoidItem {
         xhr.send()
     }
 
+    // ── Air quality (free Air Quality API, no key) ──────────────────────────
+    // Failure of any kind just clears _aqiText → the card hides. A separate
+    // sequence guard (_aqSeq) prevents a stale response from clobbering fresh data.
+    function fetchAirQuality(lat, lon) {
+        root._aqSeq++
+        var seq = root._aqSeq
+        var xhr = new XMLHttpRequest()
+        xhr.open("GET", "https://air-quality-api.open-meteo.com/v1/air-quality" +
+            "?latitude=" + lat + "&longitude=" + lon +
+            "&current=european_aqi&timezone=auto")
+        xhr.timeout = 8000
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState !== XMLHttpRequest.DONE) return
+            if (seq !== root._aqSeq) return
+            if (xhr.status === 200) {
+                try {
+                    parseAirQuality(JSON.parse(xhr.responseText))
+                    return
+                } catch (e) {}
+            }
+            _aqiText = ""
+        }
+        xhr.ontimeout = function() { if (seq === root._aqSeq) _aqiText = "" }
+        xhr.onerror   = function() { if (seq === root._aqSeq) _aqiText = "" }
+        xhr.send()
+    }
+
+    function parseAirQuality(data) {
+        var aq = (data.current || {}).european_aqi
+        if (aq == null) { _aqiText = ""; _aqiLevel = -1; return }
+        var n = Math.round(aq)
+        _aqiLevel = aq < 40 ? 0 : aq < 60 ? 1 : 2
+        var label = n < 20 ? "Отличное" :
+                    n < 40 ? "Хорошее" :
+                    n < 60 ? "Среднее" :
+                    n < 80 ? "Плохое" :
+                    n < 100 ? "Очень плохое" : "Крайне плохое"
+        _aqiText = n + " · " + label
+    }
+
     // ── Parse response ──────────────────────────────────────────────────────
     function parseOpenMeteo(data) {
         var cur = data.current || {}
@@ -461,11 +535,15 @@ PlasmoidItem {
         _currentCloudCover = cur.cloud_cover != null ? cur.cloud_cover : 0
         _currentWindSpeed  = cur.wind_speed_10m != null ? cur.wind_speed_10m : 0
         _currentWindDir    = windDegToCompass(cur.wind_direction_10m != null ? cur.wind_direction_10m : 0)
+        _currentGusts      = cur.wind_gusts_10m != null ? Math.round(cur.wind_gusts_10m * 10) / 10 : 0
         _currentPressure   = cur.pressure_msl != null ? Math.round(cur.pressure_msl * 0.75006) : 0
+        _currentDewPoint   = cur.dew_point_2m != null ? Math.round(cur.dew_point_2m * 10) / 10 : 0
 
         var wmo = cur.weather_code != null ? cur.weather_code : 0
         var info = wmoInfo(wmo)
         _currentEmoji = info[0]
+        // Clear/partly-clear skies look wrong with a daytime sun at night
+        if (cur.is_day === 0 && (wmo === 0 || wmo === 1)) _currentEmoji = "🌙"
         _currentConditionRu = info[1]
 
         // Today's day-summary metrics (always available)

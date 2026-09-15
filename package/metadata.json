@@ -12,7 +12,7 @@
         "Id": "com.github.vladimirm.openmeteo-weather",
         "Name": "Open-Meteo Weather",
         "Name[ru]": "Погода Open-Meteo",
-        "Version": "1.0",
+        "Version": "1.1",
         "License": "MIT"
     },
     "X-Plasma-API-Minimum-Version": "6.0",
