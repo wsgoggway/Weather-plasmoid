@@ -3,6 +3,7 @@ import QtQuick.Layouts 1.15
 import QtQuick.Controls 2.15
 import org.kde.plasma.components 3.0 as PlasmaComponents
 import org.kde.plasma.plasmoid 2.0
+import org.kde.plasma.core 2.0 as PlasmaCore
 import org.kde.plasma.extras 2.0 as PlasmaExtras
 import org.kde.kirigami 2.20 as Kirigami
 
@@ -20,20 +21,29 @@ PlasmaExtras.Representation {
 
     required property PlasmoidItem plasmoidItem
 
+    // ── form-factor / size adaptivity ────────────────────────────────────────
+    // Desktop widgets (Planar) embed this view inline and are freely resizable;
+    // panel popups get a fixed tall size. The `narrow` breakpoint reflows the
+    // layout: 2 instead of 3 metric columns, smaller header type, tighter pad.
+    readonly property bool planar: Plasmoid.formFactor === PlasmaCore.Types.Planar
+    readonly property bool narrow: width < Kirigami.Units.gridUnit * 23
+
     // Full-bleed: collapse the popup's content margins/borders; no Page padding,
     // so the glass background fills the entire platter edge to edge.
     collapseMarginsHint: true
     padding: 0
 
-    Layout.minimumWidth: Kirigami.Units.gridUnit * 20
-    Layout.minimumHeight: Kirigami.Units.gridUnit * 16
-    Layout.preferredWidth: Kirigami.Units.gridUnit * 25
+    Layout.minimumWidth: Kirigami.Units.gridUnit * (planar ? 12 : 20)
+    Layout.minimumHeight: Kirigami.Units.gridUnit * (planar ? 8 : 16)
+    Layout.preferredWidth: Kirigami.Units.gridUnit * (planar ? 24 : 25)
     // Plasma 6 caches the popup size after first open and does not reliably
     // re-size to dynamic content, so request a tall popup — Plasma clamps it
     // to the available screen height. Typical content (7-day forecast) then
     // fits with little/no scroll; the Flickable handles overflow and reaches
     // the last day. (User can also resize manually; Plasma persists it.)
-    Layout.preferredHeight: Kirigami.Units.gridUnit * 60
+    // On the desktop the 60gu popup height would be absurd — start compact;
+    // the user resizes from there and Plasma persists the choice.
+    Layout.preferredHeight: Kirigami.Units.gridUnit * (planar ? 16 : 60)
 
     property bool showLoading: !plasmoidItem || plasmoidItem._loading
     property bool showError: plasmoidItem ? plasmoidItem._errorMessage.length > 0 : false
@@ -49,7 +59,7 @@ PlasmaExtras.Representation {
     readonly property color barCold: "#4fc3f7"
     readonly property color barWarm: "#ffb74d"
     property color negColor: Kirigami.Theme.negativeTextColor
-    readonly property int pad: Kirigami.Units.gridUnit * 1.4
+    readonly property int pad: Kirigami.Units.gridUnit * (narrow ? 0.9 : 1.4)
 
     // AQI dot: theme colors only — green/amber/red by pollution level
     readonly property color aqiDotColor: {
@@ -209,7 +219,7 @@ PlasmaExtras.Representation {
 
                     PlasmaComponents.Label {
                         text: plasmoidItem ? (plasmoidItem._currentEmoji || "🌈") : "🌈"
-                        font.pixelSize: Kirigami.Units.gridUnit * 4.2
+                        font.pixelSize: Kirigami.Units.gridUnit * (fullRoot.narrow ? 3.4 : 4.2)
                         Layout.alignment: Qt.AlignVCenter
                     }
                     ColumnLayout {
@@ -219,7 +229,7 @@ PlasmaExtras.Representation {
                             text: plasmoidItem
                                 ? (plasmoidItem._currentTemp + plasmoidItem._tempUnitLabel)
                                 : "--°"
-                            font.pixelSize: Kirigami.Units.gridUnit * 3.3
+                            font.pixelSize: Kirigami.Units.gridUnit * (fullRoot.narrow ? 2.6 : 3.3)
                             font.weight: Font.Light
                             color: fullRoot.textColor
                         }
@@ -232,6 +242,9 @@ PlasmaExtras.Representation {
                     }
                     Item { Layout.fillWidth: true }
                     ColumnLayout {
+                        id: feelsCol
+                        // very narrow widget — "feels like" already sits in the tooltip
+                        visible: fullRoot.width >= Kirigami.Units.gridUnit * 17
                         Layout.alignment: Qt.AlignVCenter
                         spacing: 0
                         PlasmaComponents.Label {
@@ -276,7 +289,8 @@ PlasmaExtras.Representation {
                     id: metricsGrid
                     anchors.fill: parent
                     anchors.margins: Kirigami.Units.gridUnit * 0.9
-                    columns: 3
+                    // reflow: 2 columns when the widget is narrow (desktop resize)
+                    columns: fullRoot.narrow ? 2 : 3
                     rowSpacing: Kirigami.Units.gridUnit * 0.7
                     columnSpacing: Kirigami.Units.gridUnit * 0.7
 
@@ -439,6 +453,8 @@ PlasmaExtras.Representation {
                         }
                         PlasmaComponents.Label {
                             Layout.preferredWidth: Kirigami.Units.gridUnit * 2.4
+                            // too narrow to afford the column — emoji + bar remain
+                            visible: fullRoot.width >= Kirigami.Units.gridUnit * 19
                             text: "💧" + (modelData.prec_prob || 0) + "%"
                             color: modelData.prec_prob >= 40 ? fullRoot.textColor : fullRoot.subtleColor
                             font.pixelSize: Kirigami.Units.gridUnit * 0.72

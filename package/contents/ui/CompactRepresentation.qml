@@ -2,10 +2,13 @@ import QtQuick 2.15
 import QtQuick.Layouts 1.15
 import org.kde.plasma.components 3.0 as PlasmaComponents
 import org.kde.plasma.plasmoid 2.0
+import org.kde.plasma.core 2.0 as PlasmaCore
 import org.kde.kirigami 2.20 as Kirigami
 
 /*
  * Compact representation — panel / system tray.
+ * Horizontal panel: emoji + temperature in a row. Vertical panel: emoji only
+ * (the panel is ~40px wide there — the temperature lives in the tooltip).
  * plasmoidItem is set by PlasmoidItem automatically (official Plasma 6 API).
  */
 MouseArea {
@@ -13,9 +16,15 @@ MouseArea {
 
     required property PlasmoidItem plasmoidItem
 
-    Layout.minimumWidth: Kirigami.Units.iconSizes.small * 3
+    readonly property bool verticalPanel: Plasmoid.formFactor === PlasmaCore.Types.Vertical
+
+    Layout.minimumWidth: verticalPanel
+                         ? Kirigami.Units.iconSizes.smallMedium
+                         : Kirigami.Units.iconSizes.small * 3
     Layout.minimumHeight: Kirigami.Units.iconSizes.smallMedium
-    Layout.preferredWidth: emojiLabel.implicitWidth + tempLabel.implicitWidth + Kirigami.Units.smallSpacing * 4
+    Layout.preferredWidth: emojiLabel.implicitWidth
+                           + (verticalPanel ? 0 : tempLabel.implicitWidth + Kirigami.Units.smallSpacing)
+                           + Kirigami.Units.smallSpacing * 4
     Layout.preferredHeight: Layout.minimumHeight
 
     RowLayout {
@@ -27,10 +36,12 @@ MouseArea {
             text: plasmoidItem ? (plasmoidItem._currentEmoji || "🌤️") : "🌤️"
             font.pointSize: Kirigami.Theme.smallFont ? Kirigami.Theme.smallFont.pointSize : 8
             visible: compactRoot.width > Kirigami.Units.iconSizes.small * 2.5
+                     || compactRoot.verticalPanel
         }
 
         PlasmaComponents.Label {
             id: tempLabel
+            visible: !compactRoot.verticalPanel
             text: {
                 if (!plasmoidItem) return "--°"
                 var t = plasmoidItem._currentTemp
