@@ -48,8 +48,16 @@ PlasmaExtras.Representation {
     readonly property color accentColor: Kirigami.Theme.highlightColor
     readonly property color barCold: "#4fc3f7"
     readonly property color barWarm: "#ffb74d"
-    readonly property color negColor: Kirigami.Theme.negativeTextColor
+    property color negColor: Kirigami.Theme.negativeTextColor
     readonly property int pad: Kirigami.Units.gridUnit * 1.4
+
+    // AQI dot: theme colors only — green/amber/red by pollution level
+    readonly property color aqiDotColor: {
+        if (!plasmoidItem || plasmoidItem._aqiLevel < 0) return fullRoot.subtleColor
+        if (plasmoidItem._aqiLevel === 0) return Kirigami.Theme.positiveTextColor
+        if (plasmoidItem._aqiLevel === 1) return Kirigami.Theme.neutralTextColor
+        return Kirigami.Theme.negativeTextColor
+    }
 
     function forecastMode() { return plasmoid.configuration.forecastMode || "daily" }
     function showDaily()  { return forecastMode() === "daily"  || forecastMode() === "both" }
@@ -130,6 +138,8 @@ PlasmaExtras.Representation {
                             plasmoidItem.geocodeCity(city, function(lat, lon, name, tz) {
                                 if (lat != null && lon != null)
                                     plasmoidItem.writeLocation(lat, lon, name, tz)
+                                else if (plasmoidItem)
+                                    plasmoidItem.showNotice("✗ Город не найден")
                             })
                     }
                     PlasmaComponents.ToolTip { text: "Найти координаты по городу" }
@@ -144,6 +154,17 @@ PlasmaExtras.Representation {
                     onClicked: { if (plasmoidItem) plasmoidItem.fetchWeather() }
                     PlasmaComponents.ToolTip { text: "Обновить" }
                 }
+            }
+
+            // ── Transient notice (geocode / IP-detect feedback) ─────────
+            PlasmaComponents.Label {
+                Layout.fillWidth: true
+                visible: plasmoidItem && plasmoidItem._noticeText.length > 0
+                text: plasmoidItem ? plasmoidItem._noticeText : ""
+                color: fullRoot.negColor
+                font.pixelSize: Kirigami.Units.gridUnit * 0.78
+                horizontalAlignment: Text.AlignHCenter
+                elide: Text.ElideRight
             }
 
             // ── Loading ─────────────────────────────────────────────────
@@ -161,24 +182,18 @@ PlasmaExtras.Representation {
                 color: fullRoot.subtleColor
             }
 
-            // ── Error ───────────────────────────────────────────────────
-            ColumnLayout {
+            // ── Error — standard Plasma empty-state message ─────────────
+            PlasmaExtras.PlaceholderMessage {
                 Layout.fillWidth: true
                 Layout.topMargin: Kirigami.Units.gridUnit * 3
                 visible: fullRoot.showError
-                spacing: Kirigami.Units.smallSpacing
-                PlasmaComponents.Label {
-                    Layout.alignment: Qt.AlignHCenter
-                    text: "⚠️ " + (plasmoidItem ? (plasmoidItem._errorMessage || "") : "")
-                    color: fullRoot.negColor
-                    wrapMode: Text.WordWrap
-                    horizontalAlignment: Text.AlignHCenter
-                    Layout.fillWidth: true
-                }
-                PlasmaComponents.Button {
-                    text: "Повторить"; icon.name: "view-refresh"
-                    Layout.alignment: Qt.AlignHCenter
-                    onClicked: { if (plasmoidItem) plasmoidItem.fetchWeather() }
+                iconName: "weather-storm"
+                text: "Не удалось загрузить погоду"
+                explanation: plasmoidItem ? (plasmoidItem._errorMessage || "") : ""
+                helpfulAction: Action {
+                    icon.name: "view-refresh"
+                    text: "Повторить"
+                    onTriggered: { if (plasmoidItem) plasmoidItem.fetchWeather() }
                 }
             }
 
@@ -197,14 +212,23 @@ PlasmaExtras.Representation {
                         font.pixelSize: Kirigami.Units.gridUnit * 4.2
                         Layout.alignment: Qt.AlignVCenter
                     }
-                    PlasmaComponents.Label {
-                        text: plasmoidItem
-                            ? (plasmoidItem._currentTemp + plasmoidItem._tempUnitLabel)
-                            : "--°"
-                        font.pixelSize: Kirigami.Units.gridUnit * 3.3
-                        font.weight: Font.Light
-                        color: fullRoot.textColor
+                    ColumnLayout {
                         Layout.alignment: Qt.AlignVCenter
+                        spacing: 0
+                        PlasmaComponents.Label {
+                            text: plasmoidItem
+                                ? (plasmoidItem._currentTemp + plasmoidItem._tempUnitLabel)
+                                : "--°"
+                            font.pixelSize: Kirigami.Units.gridUnit * 3.3
+                            font.weight: Font.Light
+                            color: fullRoot.textColor
+                        }
+                        PlasmaComponents.Label {
+                            text: plasmoidItem ? (plasmoidItem._currentConditionRu || "") : ""
+                            font.pixelSize: Kirigami.Units.gridUnit * 0.9
+                            color: fullRoot.subtleColor
+                            visible: text.length > 0
+                        }
                     }
                     Item { Layout.fillWidth: true }
                     ColumnLayout {
@@ -240,7 +264,7 @@ PlasmaExtras.Representation {
                 }
             }
 
-            // ── Metrics grid (3×2) ──────────────────────────────────────
+            // ── Metrics grid (3×3) ──────────────────────────────────────
             Rectangle {
                 Layout.fillWidth: true
                 visible: fullRoot.showContent
@@ -258,12 +282,15 @@ PlasmaExtras.Representation {
 
                     Repeater {
                         model: [
-                            { l: "💨 Ветер",     v: plasmoidItem ? (plasmoidItem._currentWindSpeed + plasmoidItem._windUnitLabel + " " + (plasmoidItem._currentWindDir||"")) : "--" },
-                            { l: "💧 Влажность", v: plasmoidItem ? (plasmoidItem._currentHumidity + "%") : "--" },
-                            { l: "🧭 Давление",  v: plasmoidItem ? (plasmoidItem._currentPressure + " мм") : "--" },
-                            { l: "🌧 Осадки",    v: plasmoidItem ? (plasmoidItem._precipSum + " мм") : "--" },
-                            { l: "☀️ УФ-индекс", v: plasmoidItem ? plasmoidItem.uvText(plasmoidItem._uvIndex) : "--" },
-                            { l: "🌅 Солнце",    v: fullRoot.sunText() }
+                            { l: "💨 Ветер",      v: plasmoidItem ? (plasmoidItem._currentWindSpeed + plasmoidItem._windUnitLabel + " " + (plasmoidItem._currentWindDir||"")) : "--" },
+                            { l: "🌬 Порывы",     v: plasmoidItem ? (plasmoidItem._currentGusts + plasmoidItem._windUnitLabel) : "--" },
+                            { l: "💦 Точка росы", v: plasmoidItem ? (plasmoidItem._currentDewPoint + plasmoidItem._tempUnitLabel) : "--" },
+                            { l: "💧 Влажность",  v: plasmoidItem ? (plasmoidItem._currentHumidity + "%") : "--" },
+                            { l: "🧭 Давление",   v: plasmoidItem ? (plasmoidItem._currentPressure + " мм") : "--" },
+                            { l: "☁️ Облачность", v: plasmoidItem ? (plasmoidItem._currentCloudCover + "%") : "--" },
+                            { l: "🌧 Осадки",     v: plasmoidItem ? (plasmoidItem._precipSum + " мм") : "--" },
+                            { l: "☀️ УФ-индекс",  v: plasmoidItem ? plasmoidItem.uvText(plasmoidItem._uvIndex) : "--" },
+                            { l: "🌅 Солнце",     v: fullRoot.sunText() }
                         ]
                         ColumnLayout {
                             Layout.fillWidth: true
@@ -282,6 +309,44 @@ PlasmaExtras.Representation {
                                 Layout.fillWidth: true
                             }
                         }
+                    }
+                }
+            }
+
+            // ── Air quality card (hidden until Air Quality API answers) ─
+            Rectangle {
+                Layout.fillWidth: true
+                visible: fullRoot.showContent && plasmoidItem && plasmoidItem._aqiText.length > 0
+                color: fullRoot.cardColor
+                radius: Kirigami.Units.gridUnit * 0.75
+                implicitHeight: aqiRow.implicitHeight + Kirigami.Units.gridUnit * 1.2
+
+                RowLayout {
+                    id: aqiRow
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
+                    anchors.margins: Kirigami.Units.gridUnit * 0.9
+                    spacing: Kirigami.Units.smallSpacing
+
+                    Rectangle {
+                        Layout.alignment: Qt.AlignVCenter
+                        implicitWidth: Kirigami.Units.gridUnit * 0.55
+                        implicitHeight: implicitWidth
+                        radius: implicitWidth / 2
+                        color: fullRoot.aqiDotColor
+                    }
+                    PlasmaComponents.Label {
+                        text: "🌫 Качество воздуха"
+                        font.pixelSize: Kirigami.Units.gridUnit * 0.72
+                        color: fullRoot.subtleColor
+                    }
+                    Item { Layout.fillWidth: true }
+                    PlasmaComponents.Label {
+                        text: plasmoidItem ? plasmoidItem._aqiText : ""
+                        font.pixelSize: Kirigami.Units.gridUnit * 0.92
+                        font.weight: Font.Medium
+                        color: fullRoot.textColor
                     }
                 }
             }
@@ -316,7 +381,7 @@ PlasmaExtras.Representation {
                     Layout.fillWidth: true
                     orientation: ListView.Horizontal
                     spacing: Kirigami.Units.gridUnit
-                    implicitHeight: Kirigami.Units.gridUnit * 5.6
+                    implicitHeight: Kirigami.Units.gridUnit * 6.8
                     clip: true
                     interactive: contentWidth > width
                     boundsBehavior: Flickable.StopAtBounds
@@ -372,6 +437,12 @@ PlasmaExtras.Representation {
                             font.pixelSize: Kirigami.Units.gridUnit * 1.35
                             horizontalAlignment: Text.AlignHCenter
                         }
+                        PlasmaComponents.Label {
+                            Layout.preferredWidth: Kirigami.Units.gridUnit * 2.4
+                            text: "💧" + (modelData.prec_prob || 0) + "%"
+                            color: modelData.prec_prob >= 40 ? fullRoot.textColor : fullRoot.subtleColor
+                            font.pixelSize: Kirigami.Units.gridUnit * 0.72
+                        }
                         // temp bar
                         Item {
                             Layout.fillWidth: true
@@ -412,6 +483,15 @@ PlasmaExtras.Representation {
                         }
                     }
                 }
+            }
+
+            // ── Last successful update ───────────────────────────────────
+            PlasmaComponents.Label {
+                Layout.alignment: Qt.AlignHCenter
+                visible: fullRoot.showContent && plasmoidItem && plasmoidItem._lastUpdate.length > 0
+                text: "Обновлено в " + plasmoidItem._lastUpdate
+                color: fullRoot.subtleColor
+                font.pixelSize: Kirigami.Units.gridUnit * 0.72
             }
 
             // bottom breathing room

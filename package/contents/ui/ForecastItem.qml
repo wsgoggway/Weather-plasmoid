@@ -19,7 +19,7 @@ Item {
     readonly property color subtleColor: Kirigami.Theme.disabledTextColor
 
     implicitWidth: Kirigami.Units.gridUnit * 3.4
-    implicitHeight: Kirigami.Units.gridUnit * 5.4
+    implicitHeight: Kirigami.Units.gridUnit * 6.6
 
     function formatHour(isoTime) {
         if (!isoTime) return ""
@@ -52,6 +52,14 @@ Item {
             font.pixelSize: Kirigami.Units.gridUnit * 0.95
             font.weight: Font.Medium
             color: forecastItem.textColor
+        }
+        PlasmaComponents.Label {
+            Layout.alignment: Qt.AlignHCenter
+            // Show rain chance even at 0% — a uniform column reads better
+            text: forecastData ? ("💧" + (forecastData.prec_prob || 0) + "%") : ""
+            font.pixelSize: Kirigami.Units.gridUnit * 0.72
+            color: forecastData && forecastData.prec_prob >= 40
+                   ? forecastItem.textColor : forecastItem.subtleColor
         }
     }
 }

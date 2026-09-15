@@ -199,8 +199,9 @@ KCM.SimpleKCM {
             placeholderText: "55.7558"
             Layout.fillWidth: true
             inputMethodHints: Qt.ImhFormattedNumbersOnly
-            validator: DoubleValidator { bottom: -90.0; top: 90.0; decimals: 6 }
-            onTextEdited: cfg_latitude = parseFloat(text) || 0
+            // Locale "C" — the dot is always accepted (ru locale would demand a comma)
+            validator: DoubleValidator { bottom: -90.0; top: 90.0; decimals: 6; locale: "C" }
+            onTextEdited: cfg_latitude = parseFloat(text.replace(",", ".")) || 0
         }
 
         TextField {
@@ -209,8 +210,8 @@ KCM.SimpleKCM {
             placeholderText: "37.6173"
             Layout.fillWidth: true
             inputMethodHints: Qt.ImhFormattedNumbersOnly
-            validator: DoubleValidator { bottom: -180.0; top: 180.0; decimals: 6 }
-            onTextEdited: cfg_longitude = parseFloat(text) || 0
+            validator: DoubleValidator { bottom: -180.0; top: 180.0; decimals: 6; locale: "C" }
+            onTextEdited: cfg_longitude = parseFloat(text.replace(",", ".")) || 0
         }
 
         TextField {
