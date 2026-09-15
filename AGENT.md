@@ -115,9 +115,14 @@ Design: theme-aware (adapts to the system light/dark theme). The full layout liv
   import QtQuick.Controls 2.15
   import org.kde.plasma.components 3.0 as PlasmaComponents
   import org.kde.plasma.plasmoid 2.0
+  import org.kde.plasma.core 2.0 as PlasmaCore   # only where formFactor/Types are used
   import org.kde.plasma.extras 2.0 as PlasmaExtras
   import org.kde.kirigami 2.20 as Kirigami
   ```
+- **Responsive layout** (desktop widgets are freely resizable; adapt, don't overflow):
+  - `FullRepresentation` reads `Plasmoid.formFactor`: **Planar** (desktop) embeds the view inline — smaller minimums (12×8 gu), compact preferred size (24×16 gu), no tall popup sizing. `narrow` = width < 23 gu → metric grid 2 columns instead of 3, smaller header type, tighter `pad`. "Ощущается как" hides below 17 gu, the daily rain-chance column below 19 gu.
+  - `CompactRepresentation`: horizontal panel → emoji + temperature row; **vertical panel** (`PlasmaCore.Types.Vertical`) → emoji only (panel is ~40 px; temperature lives in the tooltip).
+  - Content overflow is handled by the Flickable (vertical) and the interactive hourly ListView (horizontal) — never let rows clip silently.
 - Do **not** set `display:` on a textless `ToolButton`.
 
 ---
