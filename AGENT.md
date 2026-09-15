@@ -10,7 +10,7 @@ All identifiers/code are in English; descriptions are now in English as well.
 - A **Plasma 6 plasmoid (applet)** using `KPackageStructure: Plasma/Applet`.
 - Id: `com.github.vladimirm.openmeteo-weather`.
 - **No C++/Python/compilation.** Only QML + JavaScript + JSON metadata.
-- Weather source: **Open-Meteo** (no key). City geocoding — Open-Meteo Geocoding, IP geolocation — ipwhois.app (HTTPS), fallback ip-api.com (HTTP).
+- Weather source: **Open-Meteo** (no key). Air quality: **Open-Meteo Air Quality API** (European AQI, no key). City geocoding — Open-Meteo Geocoding, IP geolocation — ipwhois.app (HTTPS), fallback ip-api.com (HTTP).
 
 ---
 
@@ -24,8 +24,7 @@ package/
     │   ├── main.qml              # root (PlasmoidItem): state, network, parsing
     │   ├── CompactRepresentation.qml   # panel view (emoji + temp)
     │   ├── FullRepresentation.qml      # expanded popup (card layout)
-    │   ├── ForecastItem.qml       # forecast card (daily/hourly)
-    │   ├── DetailRow.qml          # detail row (icon + label + value)
+    │   ├── ForecastItem.qml       # hourly forecast card (time / emoji / temp / rain %)
     │   └── configGeneral.qml      # settings page (KCM.SimpleKCM)
     ├── config/
     │   ├── config.qml            # ConfigModel → one category "General"
@@ -75,15 +74,17 @@ In `configGeneral.qml`:
 - **Only free APIs without keys.** It is forbidden to add endpoints that require keys/tokens.
 - Allowed sources:
   - `api.open-meteo.com/v1/forecast` — weather
+  - `air-quality-api.open-meteo.com/v1/air-quality` — European AQI (independent request with its own sequence guard `_aqSeq`; on any failure `_aqiText` is cleared and the card hides)
   - `geocoding-api.open-meteo.com/v1/search` — city → coordinates
   - `ipwhois.app/json/` (https, primary) + `ip-api.com/json/` (http, last-resort fallback — free tier has no HTTPS) — IP geolocation
 - Before using a new API field, **verify the exact name and format with `curl`** (e.g., `uv_index_max`, `precipitation_sum`).
+- Note: on networks where Open-Meteo is throttled/blocked, verify via an HTTP-reader proxy instead and say so in the report.
 
 ---
 
 ## 5. Building the Open-Meteo Request
 
-- `current` is always included; daily metrics (`sunrise,sunset,uv_index_max,precipitation_sum`) are **always** included, regardless of forecast mode.
+- `current` is always included (incl. `wind_gusts_10m`, `dew_point_2m`, `is_day` for the night emoji); daily metrics (`sunrise,sunset,uv_index_max,precipitation_sum`) are **always** included, regardless of forecast mode.
 - Daily forecast fields (`weather_code,temperature_2m_max,...`) are included only if `wantDaily`.
 - Assemble the daily forecast array **only if `daily.weather_code` exists** (guard clause), otherwise `forecastMode=hourly` will produce garbage.
 - Hourly forecast is filtered from the current hour onward (`currentTime.substring(0,13)`), with a limit of 48 data points.
@@ -96,10 +97,13 @@ Design: theme-aware (adapts to the system light/dark theme). The full layout liv
 
 - **Root** — `PlasmaExtras.Representation` with `collapseMarginsHint: true` + `padding: 0` → full-bleed (the background fills the whole popup platter, no Plasma margins). A `Rectangle` (`glassBg`) fills it with the theme background.
 - **Palette** (constants on `fullRoot`, all theme-derived): `textColor = Kirigami.Theme.textColor`, `subtleColor = Kirigami.Theme.disabledTextColor`, `glassColor = Kirigami.Theme.backgroundColor`, `cardColor = Kirigami.Theme.alternateBackgroundColor`, `dividerColor = textColor @ 12% alpha`, `accentColor = Kirigami.Theme.highlightColor`, `negColor = Kirigami.Theme.negativeTextColor`. Only `barCold #4fc3f7` / `barWarm #ffb74d` are hardcoded (decorative temp gradient, visible on both themes). Do **not** override `Kirigami.Theme.*` — use the real system theme.
-- **Header**: location → row [emoji + large thin temperature (`Font.Light`) | "Feels like" on the right] → the joke in italics (`subtleColor`).
-- **Metrics grid 3×2**: Wind, Humidity, Pressure, Precipitation, UV index, Sun (sunrise – sunset). Each cell: an **icon-prefixed label** (`subtleColor`) + value (`textColor`, `Font.Medium`). Implemented with a `Repeater` inside a `GridLayout`.
-- **Hourly forecast** — horizontal `ListView`; items are `ForecastItem` (plain, no background); the first item shows "Now".
-- **Daily forecast** — vertical list (`Repeater` inside a `ColumnLayout`, **not** a nested ListView); each row: day / emoji / temp-bar / min / max.
+- **Header**: location → row [emoji + large thin temperature (`Font.Light`) + condition text | "Feels like" on the right] → the joke in italics (`subtleColor`). A transient `_noticeText` line (auto-hides in 4 s) reports geocode/IP-detect failures.
+- **Error state** — `PlasmaExtras.PlaceholderMessage` (`iconName`, `text`, `explanation` = `_errorMessage`, `helpfulAction` = "Повторить"). Do not hand-roll error cards.
+- **Metrics grid 3×3**: Wind (speed+dir), Gusts, Dew point, Humidity, Pressure, Cloud cover, Precipitation (day sum), UV index, Sun (sunrise – sunset). Each cell: an **icon-prefixed label** (`subtleColor`) + value (`textColor`, `Font.Medium`). Implemented with a `Repeater` inside a `GridLayout`.
+- **AQI card** — single row under the metrics grid: colored dot (`positiveTextColor` for AQI < 40, `neutralTextColor` < 60, `negativeTextColor` from 60) + "Качество воздуха" + preformatted `_aqiText` ("61 · Плохое"). Hidden until the Air Quality API answers.
+- **Hourly forecast** — horizontal `ListView`; items are `ForecastItem` (plain, no background); the first item shows "Now"; every item shows the rain-chance line (`💧NN%`, accentuated from 40%).
+- **Daily forecast** — vertical list (`Repeater` inside a `ColumnLayout`, **not** a nested ListView); each row: day / emoji / rain-chance (`💧NN%`) / temp-bar / min / max.
+- **Footer** — "Обновлено в HH:MM" (`_lastUpdate`, subtle), centered at the bottom of the popup.
 - **temp-bar**: a `dividerColor` track 6px tall + a `Gradient.Horizontal #4fc3f7→#ffb74d` fill; its position/width are fractions of `(t_min−weekMin)/(weekMax−weekMin)`, where `weekMin`/`weekMax` are computed across all forecast days.
 - `ForecastItem` is hourly-only (plain, no card background; theme-aware colors).
 - Sizing via `Kirigami.Units.gridUnit`; spacing via `largeSpacing`/`smallSpacing`.
@@ -179,7 +183,7 @@ Until then, do not expect — or "restore" — the locale pipeline in audits: it
 
 Say "done" is ready **only after**:
 
-1. `qmllint package/contents/ui/*.qml` — no errors AND no warnings. **`qmllint` exits 0 even when it prints warnings**, so read its stdout — don't trust the exit code alone.
+1. `qmllint package/contents/ui/*.qml` — no errors AND no warnings. **`qmllint` exits 0 even when it prints warnings**, so read its stdout — don't trust the exit code alone. On hosts without Plasma/KDE modules (e.g. a dev container), resolve Qt types explicitly and expect only import noise: `qmllint -I /usr/lib/x86_64-linux-gnu/qt6/qml package/contents/ui/*.qml` (Debian; the QtQuick modules live in `qml6-module-qtquick*`). Real syntax errors must be zero; warnings about `org.kde.*` imports are environmental.
 2. New/changed API fields verified with `curl` (names + format).
 3. Installed: `./install.sh --user` + `plasmashell --replace &`.
 4. Widget actually opened and tested visually/functionally:
@@ -237,8 +241,11 @@ If a step is not complete, the task is not done — do not say "ready".
 
 ```bash
 qmllint package/contents/ui/*.qml                      # syntax check
+qmllint -I /usr/lib/x86_64-linux-gnu/qt6/qml package/contents/ui/*.qml   # with resolved QtQuick (hosts without KDE)
+plasmoidviewer -a package                              # run from source dir (plasma-sdk; preferred for testing)
+plasmawindowed com.github.vladimirm.openmeteo-weather  # standalone window test (installed widget)
 ./install.sh --user                                    # user-local install (copies package/)
-plasmashell --replace &                                # restart shell
+plasmashell --replace &                                # restart shell (final check only — disruptive)
 git checkout -b feat/<name>                            # branch for a task
 git add -A && git commit -m "feat: …"                  # commit
 git checkout master && git merge --no-ff feat/<name>   # merge into master
