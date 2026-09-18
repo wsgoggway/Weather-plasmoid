@@ -108,6 +108,39 @@ void main() {
     expect(data["d2"], "☀️ 24°/13°");
   });
 
+  test("buildData: почасовая лента — Сейчас + 4 часа", () async {
+    final state = await makeState();
+    final data = WidgetSync.buildData(state);
+
+    expect(data["h0_time"], "Сейчас");
+    expect(data["h0_emoji"], "🌧️");
+    expect(data["h0_temp"], "17°");
+    expect(data["h1_time"], "15"); // "2026-09-18T15:00"
+    expect(data["h1_temp"], "18°");
+  });
+
+  test("buildData: метрики в одну строку", () async {
+    final state = await makeState();
+    final data = WidgetSync.buildData(state);
+
+    expect(data["m_humidity"], "💧62%");
+    expect(data["m_wind"], "💨3.7 м/с");
+    expect(data["m_pressure"], "🧭754 мм рт.");
+    expect(data["m_uv"], "☀️УФ 3"); // 3.4 → 3
+  });
+
+  test("buildData: часы кончились — ключи пустые, не устаревшие", () async {
+    final state = await makeState();
+    // Единственный час в ответе — остальные 4 колонки должны очиститься.
+    state.hours = const [HourItem(time: "2026-09-18T14:00", temp: 17, emoji: "🌧️", condition: "Дождь", precProb: 90)];
+    final data = WidgetSync.buildData(state);
+
+    expect(data["h0_temp"], "17°");
+    expect(data["h1_time"], "");
+    expect(data["h1_emoji"], "");
+    expect(data["h4_temp"], "");
+  });
+
   test("buildData: без данных — пустой словарь (виджет не трогаем)", () async {
     SharedPreferences.setMockInitialValues({});
     final prefs = await SharedPreferences.getInstance();
