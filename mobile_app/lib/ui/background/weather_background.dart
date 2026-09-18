@@ -1,6 +1,11 @@
 /// Динамический погодный фон (фишка Apple Weather + тренд 2026):
 /// градиент по группе погодных условий и времени суток + лёгкие частицы
 /// (дождь / снег / звёзды / облачность / туман). Анимации отключаются настройкой.
+///
+/// Производительность: частицы предрассчитаны один раз (не генерируются
+/// заново в каждом кадре), прогресс квантован до 30 fps (дрейф медленный —
+/// глазу неотличимо, растровых проходов вдвое меньше), painter обёрнут
+/// в RepaintBoundary, чтобы его перерисовки не задевали остальные слои.
 library;
 
 import 'dart:math';
@@ -21,22 +26,7 @@ WeatherKind weatherKind({required int wmo, required bool isDay}) {
 }
 
 bool isRainyCode(int c) => const [
-  51,
-  53,
-  55,
-  56,
-  57,
-  61,
-  63,
-  65,
-  66,
-  67,
-  80,
-  81,
-  82,
-  95,
-  96,
-  99,
+  51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82, 95, 96, 99,
 ].contains(c);
 bool isSnowyCode(int c) => const [71, 73, 75, 77, 85, 86].contains(c);
 bool isFoggyCode(int c) => c == 45 || c == 48;
@@ -84,6 +74,36 @@ class _WeatherBackgroundState extends State<WeatherBackground>
     duration: const Duration(seconds: 20),
   )..repeat();
 
+  List<_Particle> _particles = const [];
+
+  @override
+  void initState() {
+    super.initState();
+    _regenParticles();
+  }
+
+  @override
+  void didUpdateWidget(WeatherBackground oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.kind != widget.kind) _regenParticles();
+  }
+
+  void _regenParticles() {
+    final rnd = Random(widget.kind.index * 7 + 3);
+    _particles = List.generate(
+      _particleCountFor(widget.kind),
+      (_) => _Particle.seeded(rnd),
+    );
+  }
+
+  static int _particleCountFor(WeatherKind kind) => switch (kind) {
+    WeatherKind.rain || WeatherKind.storm => 70,
+    WeatherKind.snow => 60,
+    WeatherKind.clearNight => 50,
+    WeatherKind.fog => 10,
+    WeatherKind.cloudy || WeatherKind.clearDay => 6,
+  };
+
   @override
   void dispose() {
     _controller.dispose();
@@ -104,14 +124,17 @@ class _WeatherBackgroundState extends State<WeatherBackground>
         ),
       ),
       child: widget.animate
-          ? AnimatedBuilder(
-              animation: _controller,
-              builder: (context, _) => CustomPaint(
-                painter: _ParticlesPainter(
-                  kind: widget.kind,
-                  progress: _controller.value,
+          ? RepaintBoundary(
+              child: AnimatedBuilder(
+                animation: _controller,
+                builder: (context, _) => CustomPaint(
+                  painter: _ParticlesPainter(
+                    kind: widget.kind,
+                    progress: (_controller.value * 30).floorToDouble() / 30,
+                    particles: _particles,
+                  ),
+                  child: const SizedBox.expand(),
                 ),
-                child: const SizedBox.expand(),
               ),
             )
           : null,
@@ -140,27 +163,28 @@ class _Particle {
 class _ParticlesPainter extends CustomPainter {
   final WeatherKind kind;
   final double progress;
+  final List<_Particle> particles;
 
-  _ParticlesPainter({required this.kind, required this.progress});
+  _ParticlesPainter({
+    required this.kind,
+    required this.progress,
+    required this.particles,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
-    // Детерминированный набор частиц: одинаковый кадр при одном progress.
-    final rnd = Random(42);
     final paint = Paint()..style = PaintingStyle.fill;
 
     switch (kind) {
       case WeatherKind.rain || WeatherKind.storm:
-        const n = 70;
-        for (var i = 0; i < n; i++) {
-          final p = _Particle.seeded(rnd);
+        paint.style = PaintingStyle.stroke;
+        for (final p in particles) {
           final fall = ((progress * (0.6 + p.speed) + p.y) % 1.0);
           final dx = 18 * p.speed; // лёгкий наклон
           final y = fall * size.height;
           final x = p.x * size.width + dx * fall;
           paint.color = Colors.white.withValues(alpha: 0.10 + 0.10 * p.size);
           paint.strokeWidth = 1.2 * p.size;
-          paint.style = PaintingStyle.stroke;
           canvas.drawLine(
             Offset(x, y),
             Offset(x - dx * 0.12, y + 14 * p.size),
@@ -168,9 +192,7 @@ class _ParticlesPainter extends CustomPainter {
           );
         }
       case WeatherKind.snow:
-        const n = 60;
-        for (var i = 0; i < n; i++) {
-          final p = _Particle.seeded(rnd);
+        for (final p in particles) {
           final fall = ((progress * (0.15 + 0.1 * p.speed) + p.y) % 1.0);
           final sway = sin((progress * 2 * pi + p.phase)) * 12;
           paint
@@ -183,9 +205,7 @@ class _ParticlesPainter extends CustomPainter {
           );
         }
       case WeatherKind.clearNight:
-        const n = 50;
-        for (var i = 0; i < n; i++) {
-          final p = _Particle.seeded(rnd);
+        for (final p in particles) {
           final twinkle = 0.5 + 0.5 * sin(progress * 2 * pi * 3 + p.phase);
           paint.color = Colors.white.withValues(
             alpha: 0.15 + 0.45 * twinkle * p.size,
@@ -196,15 +216,17 @@ class _ParticlesPainter extends CustomPainter {
             paint,
           );
         }
-      case WeatherKind.cloudy || WeatherKind.clearDay:
+      case WeatherKind.cloudy || WeatherKind.clearDay || WeatherKind.fog:
         _driftClouds(
           canvas,
           size,
           paint,
-          alpha: kind == WeatherKind.cloudy ? 0.06 : 0.05,
+          alpha: kind == WeatherKind.fog
+              ? 0.10
+              : kind == WeatherKind.cloudy
+              ? 0.06
+              : 0.05,
         );
-      case WeatherKind.fog:
-        _driftClouds(canvas, size, paint, alpha: 0.10);
     }
   }
 
@@ -214,9 +236,7 @@ class _ParticlesPainter extends CustomPainter {
     Paint paint, {
     required double alpha,
   }) {
-    final rnd = Random(7);
-    for (var i = 0; i < 6; i++) {
-      final p = _Particle.seeded(rnd);
+    for (final p in particles) {
       final drift = ((progress * 0.05 * p.speed + p.x) % 1.2) - 0.1;
       final cx = drift * size.width;
       final cy = p.y * size.height * 0.7 + 40;
@@ -234,5 +254,7 @@ class _ParticlesPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_ParticlesPainter oldDelegate) =>
-      oldDelegate.progress != progress || oldDelegate.kind != kind;
+      oldDelegate.progress != progress ||
+      oldDelegate.kind != kind ||
+      !identical(oldDelegate.particles, particles);
 }

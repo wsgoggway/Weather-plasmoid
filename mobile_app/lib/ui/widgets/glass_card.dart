@@ -1,8 +1,10 @@
 /// Стеклянная карточка — базовый контейнер всех секций (glassmorphism):
-/// полупрозрачный фон + размытие подложки + тонкая рамка, радиус 16.
+/// полупрозрачная заливка с «морозным» бликом + тонкая рамка, радиус 16.
+///
+/// Осознанно БЕЗ живого BackdropFilter: десяток блюров на экране — главный
+/// источник лагов, а при скролле блюр внутри списка ещё и глючит (теряет
+/// подложку). Статичный градиент даёт тот же вид стекла без цены блюра.
 library;
-
-import 'dart:ui';
 
 import 'package:flutter/material.dart';
 
@@ -25,20 +27,20 @@ class GlassCard extends StatelessWidget {
     final glass = context.glass;
     return Padding(
       padding: margin ?? const EdgeInsets.symmetric(horizontal: 16),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-          child: Container(
-            padding: padding,
-            decoration: BoxDecoration(
-              color: glass.card,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: glass.cardBorder, width: 1),
-            ),
-            child: child,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: glass.cardBorder, width: 1),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Colors.white.withValues(alpha: 0.10),
+              Colors.white.withValues(alpha: 0.04),
+            ],
           ),
         ),
+        child: Padding(padding: padding, child: child),
       ),
     );
   }
