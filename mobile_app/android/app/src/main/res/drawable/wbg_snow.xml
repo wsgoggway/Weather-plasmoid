@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Фон виджета: снег -->
+<!-- Фон виджета (светлый день): снег -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android"
     android:shape="rectangle">
     <gradient
         android:angle="270"
-        android:startColor="#5A7089"
-        android:endColor="#323F4E" />
-    <corners android:radius="22dp" />
+        android:startColor="#86A2BE"
+        android:endColor="#C9D9E8" />
+    <corners android:radius="24dp" />
     <stroke
         android:width="1dp"
-        android:color="#1FFFFFFF" />
+        android:color="#24FFFFFF" />
 </shape>
