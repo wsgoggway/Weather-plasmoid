@@ -26,7 +26,22 @@ WeatherKind weatherKind({required int wmo, required bool isDay}) {
 }
 
 bool isRainyCode(int c) => const [
-  51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82, 95, 96, 99,
+  51,
+  53,
+  55,
+  56,
+  57,
+  61,
+  63,
+  65,
+  66,
+  67,
+  80,
+  81,
+  82,
+  95,
+  96,
+  99,
 ].contains(c);
 bool isSnowyCode(int c) => const [71, 73, 75, 77, 85, 86].contains(c);
 bool isFoggyCode(int c) => c == 45 || c == 48;
