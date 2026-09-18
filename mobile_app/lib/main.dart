@@ -7,6 +7,7 @@ import 'data/cities_store.dart';
 import 'data/open_meteo_api.dart';
 import 'data/settings_store.dart';
 import 'data/weather_state.dart';
+import 'data/widget_sync.dart';
 import 'ui/home_screen.dart';
 
 Future<void> main() async {
@@ -45,6 +46,8 @@ class _WeatherAppState extends State<WeatherApp> {
     try {
       Geolocator.requestPermission();
     } catch (_) {}
+    // Фоновое обновление домашнего виджета (Android; вне Android — no-op).
+    registerWidgetBackgroundRefresh(settings);
   }
 
   @override

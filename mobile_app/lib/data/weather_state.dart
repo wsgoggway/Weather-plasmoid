@@ -10,6 +10,7 @@ import 'package:flutter/foundation.dart';
 import 'cities_store.dart';
 import 'open_meteo_api.dart';
 import 'settings_store.dart';
+import 'widget_sync.dart';
 import '../domain/alerts.dart';
 import '../domain/jokes.dart';
 import '../domain/nowcast.dart';
@@ -165,6 +166,8 @@ class WeatherState extends ChangeNotifier {
       errorMessage = "";
       lastUpdate = DateTime.now();
       notifyListeners();
+      // Домашний виджет — необязательный подписчик: ошибки глотаются внутри.
+      await WidgetSync.update(this);
     } on ApiException catch (e) {
       if (seq != _seq) return;
       status = LoadStatus.error;
