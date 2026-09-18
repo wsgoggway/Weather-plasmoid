@@ -1,43 +1,88 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Виджет «Погода» — собирательный образ по виджетам Apple Weather
-     (текущая + почасовая лента), Pixel Weather (полоса часов) и
-     Gismeteo/Overdrop (метрики в одну строку).
+<!--
+    Виджет «Погода» v2 — собирательный образ Apple Weather / Pixel Weather.
 
-     Два режима по высоте (переключает провайдер через setViewVisibility):
-     - 4×3 (по умолчанию): заголовок + почасовая лента + метрики + 3 дня;
-     - 4×2 (сжатый): секции часов и метрик скрыты (GONE).
+    Дизайн-приёмы:
+    - крупная тонкая температура + векторная иконка погоды (Apple);
+    - фон-градиент подставляется под погоду/время суток (Pixel), см.
+      drawable/wbg_*.xml — переключается из WeatherWidgetProvider;
+    - ↑max тёплым / ↓min холодным (Pixel), метрики плитками
+      «значение + подпись капсом» (Apple tiles).
 
-     Только RemoteViews-совместимые view: Frame/LinearLayout, TextView.
-     Распорки — пустые LinearLayout (Space в белый список не входит). -->
+    Два режима по высоте (переключает провайдер): 4×3 полный, при сжатии
+    hourly/metrics-секции уходят в GONE → компакт 4×2.
+
+    Только RemoteViews-совместимые view: Frame/LinearLayout, TextView,
+    ImageView. Распорки — пустые LinearLayout (Space нельзя!).
+-->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@drawable/widget_background">
+    android:background="@drawable/wbg_clear_night">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical"
-        android:paddingLeft="14dp"
+        android:paddingLeft="16dp"
         android:paddingTop="12dp"
-        android:paddingRight="14dp"
+        android:paddingRight="16dp"
         android:paddingBottom="10dp">
 
-        <!-- ── Заголовок: эмодзи + температура | город + состояние ── -->
+        <!-- ── Строка города: город | ↑max ↓min ── -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:gravity="center_vertical"
             android:orientation="horizontal">
 
             <TextView
-                android:id="@+id/widget_emoji"
+                android:id="@+id/widget_city"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:text="Погода"
+                android:textColor="#F2FFFFFF"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/widget_hi"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginRight="10dp"
-                android:textSize="30sp"
-                android:text="" />
+                android:layout_marginLeft="8dp"
+                android:text=""
+                android:textColor="#FFCC80"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/widget_lo"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginLeft="6dp"
+                android:text=""
+                android:textColor="#81D4FA"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <!-- ── Герой: иконка + огромная тонкая температура | состояние ── -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <ImageView
+                android:id="@+id/widget_icon"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:layout_marginRight="8dp"
+                android:src="@drawable/wi_cloud" />
 
             <TextView
                 android:id="@+id/widget_temp"
@@ -45,9 +90,9 @@
                 android:layout_height="wrap_content"
                 android:fontFamily="sans-serif-light"
                 android:includeFontPadding="false"
-                android:text=""
-                android:textColor="#F2FFFFFF"
-                android:textSize="38sp" />
+                android:text="--°"
+                android:textColor="#FFFFFF"
+                android:textSize="50sp" />
 
             <LinearLayout
                 android:layout_width="0dp"
@@ -57,348 +102,491 @@
                 android:orientation="vertical">
 
                 <TextView
-                    android:id="@+id/widget_city"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:ellipsize="end"
-                    android:gravity="end"
-                    android:maxLines="1"
-                    android:maxWidth="140dp"
-                    android:text=""
-                    android:textColor="#F2FFFFFF"
-                    android:textSize="13sp"
-                    android:textStyle="bold" />
-
-                <TextView
                     android:id="@+id/widget_condition"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:ellipsize="end"
                     android:gravity="end"
                     android:maxLines="1"
-                    android:maxWidth="140dp"
+                    android:maxWidth="130dp"
                     android:text=""
-                    android:textColor="#99FFFFFF"
+                    android:textColor="#E6FFFFFF"
                     android:textSize="12sp" />
+
+                <TextView
+                    android:id="@+id/widget_feels"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:gravity="end"
+                    android:maxLines="1"
+                    android:maxWidth="130dp"
+                    android:text=""
+                    android:textColor="#8CFFFFFF"
+                    android:textSize="10.5sp" />
             </LinearLayout>
         </LinearLayout>
 
-        <TextView
-            android:id="@+id/widget_details"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="2dp"
-            android:ellipsize="end"
-            android:maxLines="1"
-            android:text=""
-            android:textColor="#B3FFFFFF"
-            android:textSize="12sp" />
-
-        <!-- ── Средняя часть: часы + метрики + дни (скрывается в 4×2) ── -->
+        <!-- ── Средняя часть: часы + метрики (GONE в компакт-режиме) ── -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:layout_weight="1"
             android:orientation="vertical">
 
-            <!-- Почасовая лента: Сейчас + 4 часа (как у Apple/Pixel) -->
             <LinearLayout
                 android:id="@+id/widget_hourly_section"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:orientation="horizontal">
+                android:orientation="vertical">
 
                 <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:gravity="center_horizontal"
-                    android:orientation="vertical">
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginTop="6dp"
+                    android:layout_marginBottom="6dp"
+                    android:background="#1FFFFFFF"
+                    android:orientation="horizontal" />
 
-                    <TextView
-                        android:id="@+id/widget_h0_time"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text=""
-                        android:textColor="#B3FFFFFF"
-                        android:textSize="10sp" />
-
-                    <TextView
-                        android:id="@+id/widget_h0_emoji"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text=""
-                        android:textSize="16sp" />
-
-                    <TextView
-                        android:id="@+id/widget_h0_temp"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text=""
-                        android:textColor="#F2FFFFFF"
-                        android:textSize="12sp" />
-                </LinearLayout>
-
+                <!-- 5 одинаковых колонок: время / иконка / температура -->
                 <LinearLayout
-                    android:layout_width="0dp"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:gravity="center_horizontal"
-                    android:orientation="vertical">
+                    android:orientation="horizontal">
 
-                    <TextView
-                        android:id="@+id/widget_h1_time"
-                        android:layout_width="wrap_content"
+                    <LinearLayout
+                        android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:text=""
-                        android:textColor="#B3FFFFFF"
-                        android:textSize="10sp" />
+                        android:layout_weight="1"
+                        android:gravity="center_horizontal"
+                        android:orientation="vertical">
 
-                    <TextView
-                        android:id="@+id/widget_h1_emoji"
-                        android:layout_width="wrap_content"
+                        <TextView
+                            android:id="@+id/widget_h0_time"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text=""
+                            android:textColor="#B3FFFFFF"
+                            android:textSize="10sp" />
+
+                        <ImageView
+                            android:id="@+id/widget_h0_icon"
+                            android:layout_width="20dp"
+                            android:layout_height="20dp"
+                            android:layout_marginTop="1dp"
+                            android:src="@drawable/wi_cloud" />
+
+                        <TextView
+                            android:id="@+id/widget_h0_temp"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text=""
+                            android:textColor="#F2FFFFFF"
+                            android:textSize="12.5sp"
+                            android:textStyle="bold" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:text=""
-                        android:textSize="16sp" />
+                        android:layout_weight="1"
+                        android:gravity="center_horizontal"
+                        android:orientation="vertical">
 
-                    <TextView
-                        android:id="@+id/widget_h1_temp"
-                        android:layout_width="wrap_content"
+                        <TextView
+                            android:id="@+id/widget_h1_time"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text=""
+                            android:textColor="#B3FFFFFF"
+                            android:textSize="10sp" />
+
+                        <ImageView
+                            android:id="@+id/widget_h1_icon"
+                            android:layout_width="20dp"
+                            android:layout_height="20dp"
+                            android:layout_marginTop="1dp"
+                            android:src="@drawable/wi_cloud" />
+
+                        <TextView
+                            android:id="@+id/widget_h1_temp"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text=""
+                            android:textColor="#D9FFFFFF"
+                            android:textSize="12.5sp" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:text=""
-                        android:textColor="#F2FFFFFF"
-                        android:textSize="12sp" />
-                </LinearLayout>
+                        android:layout_weight="1"
+                        android:gravity="center_horizontal"
+                        android:orientation="vertical">
 
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:gravity="center_horizontal"
-                    android:orientation="vertical">
+                        <TextView
+                            android:id="@+id/widget_h2_time"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text=""
+                            android:textColor="#B3FFFFFF"
+                            android:textSize="10sp" />
 
-                    <TextView
-                        android:id="@+id/widget_h2_time"
-                        android:layout_width="wrap_content"
+                        <ImageView
+                            android:id="@+id/widget_h2_icon"
+                            android:layout_width="20dp"
+                            android:layout_height="20dp"
+                            android:layout_marginTop="1dp"
+                            android:src="@drawable/wi_cloud" />
+
+                        <TextView
+                            android:id="@+id/widget_h2_temp"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text=""
+                            android:textColor="#D9FFFFFF"
+                            android:textSize="12.5sp" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:text=""
-                        android:textColor="#B3FFFFFF"
-                        android:textSize="10sp" />
+                        android:layout_weight="1"
+                        android:gravity="center_horizontal"
+                        android:orientation="vertical">
 
-                    <TextView
-                        android:id="@+id/widget_h2_emoji"
-                        android:layout_width="wrap_content"
+                        <TextView
+                            android:id="@+id/widget_h3_time"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text=""
+                            android:textColor="#B3FFFFFF"
+                            android:textSize="10sp" />
+
+                        <ImageView
+                            android:id="@+id/widget_h3_icon"
+                            android:layout_width="20dp"
+                            android:layout_height="20dp"
+                            android:layout_marginTop="1dp"
+                            android:src="@drawable/wi_cloud" />
+
+                        <TextView
+                            android:id="@+id/widget_h3_temp"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text=""
+                            android:textColor="#D9FFFFFF"
+                            android:textSize="12.5sp" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:text=""
-                        android:textSize="16sp" />
+                        android:layout_weight="1"
+                        android:gravity="center_horizontal"
+                        android:orientation="vertical">
 
-                    <TextView
-                        android:id="@+id/widget_h2_temp"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text=""
-                        android:textColor="#F2FFFFFF"
-                        android:textSize="12sp" />
-                </LinearLayout>
+                        <TextView
+                            android:id="@+id/widget_h4_time"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text=""
+                            android:textColor="#B3FFFFFF"
+                            android:textSize="10sp" />
 
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:gravity="center_horizontal"
-                    android:orientation="vertical">
+                        <ImageView
+                            android:id="@+id/widget_h4_icon"
+                            android:layout_width="20dp"
+                            android:layout_height="20dp"
+                            android:layout_marginTop="1dp"
+                            android:src="@drawable/wi_cloud" />
 
-                    <TextView
-                        android:id="@+id/widget_h3_time"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text=""
-                        android:textColor="#B3FFFFFF"
-                        android:textSize="10sp" />
-
-                    <TextView
-                        android:id="@+id/widget_h3_emoji"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text=""
-                        android:textSize="16sp" />
-
-                    <TextView
-                        android:id="@+id/widget_h3_temp"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text=""
-                        android:textColor="#F2FFFFFF"
-                        android:textSize="12sp" />
-                </LinearLayout>
-
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:gravity="center_horizontal"
-                    android:orientation="vertical">
-
-                    <TextView
-                        android:id="@+id/widget_h4_time"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text=""
-                        android:textColor="#B3FFFFFF"
-                        android:textSize="10sp" />
-
-                    <TextView
-                        android:id="@+id/widget_h4_emoji"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text=""
-                        android:textSize="16sp" />
-
-                    <TextView
-                        android:id="@+id/widget_h4_temp"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text=""
-                        android:textColor="#F2FFFFFF"
-                        android:textSize="12sp" />
+                        <TextView
+                            android:id="@+id/widget_h4_temp"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text=""
+                            android:textColor="#D9FFFFFF"
+                            android:textSize="12.5sp" />
+                    </LinearLayout>
                 </LinearLayout>
             </LinearLayout>
 
-            <!-- Метрики в одну строку: 💧 влажность · 💨 ветер · 🧭 давление · ☀️ УФ -->
             <LinearLayout
                 android:id="@+id/widget_metrics_section"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:orientation="horizontal">
+                android:orientation="vertical">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginTop="6dp"
+                    android:layout_marginBottom="7dp"
+                    android:background="#1FFFFFFF"
+                    android:orientation="horizontal" />
+
+                <!-- 4 плитки «значение + подпись» (Apple style) -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:gravity="center_horizontal"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:id="@+id/widget_mv0"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text=""
+                            android:textColor="#F2FFFFFF"
+                            android:textSize="12.5sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/widget_ml0"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text=""
+                            android:textColor="#8CFFFFFF"
+                            android:textSize="8.5sp"
+                            android:textAllCaps="true" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:gravity="center_horizontal"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:id="@+id/widget_mv1"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text=""
+                            android:textColor="#F2FFFFFF"
+                            android:textSize="12.5sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/widget_ml1"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text=""
+                            android:textColor="#8CFFFFFF"
+                            android:textSize="8.5sp"
+                            android:textAllCaps="true" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:gravity="center_horizontal"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:id="@+id/widget_mv2"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text=""
+                            android:textColor="#F2FFFFFF"
+                            android:textSize="12.5sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/widget_ml2"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text=""
+                            android:textColor="#8CFFFFFF"
+                            android:textSize="8.5sp"
+                            android:textAllCaps="true" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:gravity="center_horizontal"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:id="@+id/widget_mv3"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text=""
+                            android:textColor="#F2FFFFFF"
+                            android:textSize="12.5sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/widget_ml3"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text=""
+                            android:textColor="#8CFFFFFF"
+                            android:textSize="8.5sp"
+                            android:textAllCaps="true" />
+                    </LinearLayout>
+                </LinearLayout>
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- ── Прогноз на 3 дня: подпись / иконка + ↑max ↓min ── -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:orientation="horizontal">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:gravity="center_horizontal"
+                android:orientation="vertical">
 
                 <TextView
-                    android:id="@+id/widget_m_humidity"
-                    android:layout_width="0dp"
+                    android:id="@+id/widget_d0_label"
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:ellipsize="end"
-                    android:gravity="center"
-                    android:maxLines="1"
                     android:text=""
-                    android:textColor="#E6FFFFFF"
-                    android:textSize="11sp" />
+                    android:textColor="#B3FFFFFF"
+                    android:textSize="10sp" />
 
-                <TextView
-                    android:id="@+id/widget_m_wind"
-                    android:layout_width="0dp"
+                <LinearLayout
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:ellipsize="end"
-                    android:gravity="center"
-                    android:maxLines="1"
-                    android:text=""
-                    android:textColor="#E6FFFFFF"
-                    android:textSize="11sp" />
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
 
-                <TextView
-                    android:id="@+id/widget_m_pressure"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:ellipsize="end"
-                    android:gravity="center"
-                    android:maxLines="1"
-                    android:text=""
-                    android:textColor="#E6FFFFFF"
-                    android:textSize="11sp" />
+                    <ImageView
+                        android:id="@+id/widget_d0_icon"
+                        android:layout_width="15dp"
+                        android:layout_height="15dp"
+                        android:src="@drawable/wi_cloud" />
 
-                <TextView
-                    android:id="@+id/widget_m_uv"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:ellipsize="end"
-                    android:gravity="center"
-                    android:maxLines="1"
-                    android:text=""
-                    android:textColor="#E6FFFFFF"
-                    android:textSize="11sp" />
+                    <TextView
+                        android:id="@+id/widget_d0_max"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginLeft="3dp"
+                        android:text=""
+                        android:textColor="#FFCC80"
+                        android:textSize="12.5sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/widget_d0_min"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginLeft="3dp"
+                        android:text=""
+                        android:textColor="#81D4FA"
+                        android:textSize="12.5sp" />
+                </LinearLayout>
             </LinearLayout>
 
-            <!-- Прогноз на 3 дня -->
             <LinearLayout
-                android:layout_width="match_parent"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:orientation="horizontal">
+                android:layout_weight="1"
+                android:gravity="center_horizontal"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/widget_d1_label"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text=""
+                    android:textColor="#B3FFFFFF"
+                    android:textSize="10sp" />
 
                 <LinearLayout
-                    android:layout_width="0dp"
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:gravity="center_horizontal"
-                    android:orientation="vertical">
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <ImageView
+                        android:id="@+id/widget_d1_icon"
+                        android:layout_width="15dp"
+                        android:layout_height="15dp"
+                        android:src="@drawable/wi_cloud" />
 
                     <TextView
-                        android:id="@+id/widget_d0_label"
+                        android:id="@+id/widget_d1_max"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
+                        android:layout_marginLeft="3dp"
                         android:text=""
-                        android:textColor="#99FFFFFF"
-                        android:textSize="11sp" />
+                        android:textColor="#FFCC80"
+                        android:textSize="12.5sp"
+                        android:textStyle="bold" />
 
                     <TextView
-                        android:id="@+id/widget_d0"
+                        android:id="@+id/widget_d1_min"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
+                        android:layout_marginLeft="3dp"
                         android:text=""
-                        android:textColor="#F2FFFFFF"
-                        android:textSize="13sp" />
+                        android:textColor="#81D4FA"
+                        android:textSize="12.5sp" />
                 </LinearLayout>
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:gravity="center_horizontal"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/widget_d2_label"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text=""
+                    android:textColor="#B3FFFFFF"
+                    android:textSize="10sp" />
 
                 <LinearLayout
-                    android:layout_width="0dp"
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:gravity="center_horizontal"
-                    android:orientation="vertical">
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <ImageView
+                        android:id="@+id/widget_d2_icon"
+                        android:layout_width="15dp"
+                        android:layout_height="15dp"
+                        android:src="@drawable/wi_cloud" />
 
                     <TextView
-                        android:id="@+id/widget_d1_label"
+                        android:id="@+id/widget_d2_max"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
+                        android:layout_marginLeft="3dp"
                         android:text=""
-                        android:textColor="#99FFFFFF"
-                        android:textSize="11sp" />
+                        android:textColor="#FFCC80"
+                        android:textSize="12.5sp"
+                        android:textStyle="bold" />
 
                     <TextView
-                        android:id="@+id/widget_d1"
+                        android:id="@+id/widget_d2_min"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
+                        android:layout_marginLeft="3dp"
                         android:text=""
-                        android:textColor="#F2FFFFFF"
-                        android:textSize="13sp" />
-                </LinearLayout>
-
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:gravity="center_horizontal"
-                    android:orientation="vertical">
-
-                    <TextView
-                        android:id="@+id/widget_d2_label"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text=""
-                        android:textColor="#99FFFFFF"
-                        android:textSize="11sp" />
-
-                    <TextView
-                        android:id="@+id/widget_d2"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text=""
-                        android:textColor="#F2FFFFFF"
-                        android:textSize="13sp" />
+                        android:textColor="#81D4FA"
+                        android:textSize="12.5sp" />
                 </LinearLayout>
             </LinearLayout>
         </LinearLayout>
@@ -407,12 +595,12 @@
             android:id="@+id/widget_updated"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
+            android:layout_marginTop="5dp"
             android:ellipsize="end"
             android:gravity="center"
             android:maxLines="1"
             android:text=""
-            android:textColor="#80FFFFFF"
-            android:textSize="10sp" />
+            android:textColor="#73FFFFFF"
+            android:textSize="9.5sp" />
     </LinearLayout>
 </FrameLayout>
