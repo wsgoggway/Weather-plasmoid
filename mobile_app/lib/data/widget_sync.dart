@@ -20,7 +20,13 @@ class WidgetSync {
   static const _qualifiedProvider =
       "com.github.vladimirm.openmeteo_weather.WeatherWidgetProvider";
 
+  /// Часов в ленте виджета (Сейчас + 4) и число колонок дней.
+  static const _hourlyCount = 5;
+  static const _dailyCount = 3;
+
   /// Чистая сборка словаря для виджета из состояния — покрыта тестами.
+  /// Ключи без данных всегда пишутся пустыми, чтобы в виджете не оставалось
+  /// устаревших значений от прошлого города или прошлого запуска.
   static Map<String, String> buildData(WeatherState state) {
     final cur = state.current;
     if (cur == null) return const {};
@@ -39,18 +45,54 @@ class WidgetSync {
           : "",
     };
 
-    for (var i = 0; i < 3; i++) {
-      if (i >= state.days.length) break;
-      final d = state.days[i];
-      data["d${i}_label"] = switch (i) {
-        0 => "Сегодня",
-        1 => "Завтра",
-        _ => dayLabel(d.date, i),
-      };
-      data["d$i"] = "${d.emoji} ${d.tempMax}°/${d.tempMin}°";
+    // Почасовая лента (Apple Weather / Pixel style): время, эмодзи, t°.
+    final hours = state.hours.take(_hourlyCount).toList();
+    for (var i = 0; i < _hourlyCount; i++) {
+      if (i < hours.length) {
+        data["h${i}_time"] = i == 0 ? "Сейчас" : _hour(hours[i].time);
+        data["h${i}_emoji"] = hours[i].emoji;
+        data["h${i}_temp"] = "${hours[i].temp}°";
+      } else {
+        data["h${i}_time"] = "";
+        data["h${i}_emoji"] = "";
+        data["h${i}_temp"] = "";
+      }
+    }
+
+    // Метрики в одну строку (Gismeteo/Overdrop style).
+    data["m_humidity"] = "💧${cur.humidity}%";
+    data["m_wind"] = "💨${_num(cur.windSpeed)} ${state.windUnitLabel}";
+    data["m_pressure"] = "🧭${cur.pressure} ${state.pressureUnitLabel}";
+    data["m_uv"] = "☀️УФ ${state.uvIndex.round()}";
+
+    // Прогноз на 3 дня.
+    for (var i = 0; i < _dailyCount; i++) {
+      if (i < state.days.length) {
+        final d = state.days[i];
+        data["d${i}_label"] = switch (i) {
+          0 => "Сегодня",
+          1 => "Завтра",
+          _ => dayLabel(d.date, i),
+        };
+        data["d$i"] = "${d.emoji} ${d.tempMax}°/${d.tempMin}°";
+      } else {
+        data["d${i}_label"] = "";
+        data["d$i"] = "";
+      }
     }
     return data;
   }
+
+  /// "2026-09-18T15:00" → "15".
+  static String _hour(String isoTime) {
+    final parts = isoTime.split("T");
+    if (parts.length < 2) return isoTime;
+    final hh = parts[1].split(":").first;
+    return hh;
+  }
+
+  /// Красивое число: 3 → "3", 3.7 → "3.7".
+  static String _num(num v) => v % 1 == 0 ? v.toInt().toString() : v.toString();
 
   /// Пишет данные и перерисовывает виджет. Любая ошибка (не Android,
   /// тесты, нет виджета) тихо игнорируется — виджет опционален.
