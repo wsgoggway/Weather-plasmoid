@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Переменная облачность (ночь): луна + облако. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <group
+        android:translateX="8.2"
+        android:translateY="-1.4"
+        android:scaleX="0.62"
+        android:scaleY="0.62">
+        <path
+            android:fillColor="#D6DEEA"
+            android:pathData="M12,3c-4.97,0 -9,4.03 -9,9s4.03,9 9,9 9,-4.03 9,-9c0,-0.46 -0.04,-0.92 -0.1,-1.36 -0.98,1.37 -2.58,2.26 -4.4,2.26 -2.98,0 -5.4,-2.42 -5.4,-5.4 0,-1.81 0.89,-3.42 2.26,-4.4C12.92,3.04 12.46,3 12,3L12,3z" />
+    </group>
+    <group
+        android:translateX="-0.6"
+        android:translateY="3.4">
+        <path
+            android:fillColor="#E8EDF5"
+            android:pathData="M9.5,9.4 a3.6,3.6 0 1,0 0,7.2 a3.6,3.6 0 1,0 0,-7.2 Z" />
+        <path
+            android:fillColor="#E8EDF5"
+            android:pathData="M15,7.8 a4.2,4.2 0 1,0 0,8.4 a4.2,4.2 0 1,0 0,-8.4 Z" />
+        <path
+            android:fillColor="#E8EDF5"
+            android:pathData="M8.2,12.8 L16.3,12.8 A2.2,2.2 0 0 1 18.5,15 A2.2,2.2 0 0 1 16.3,17.2 L8.2,17.2 A2.2,2.2 0 0 1 6,15 A2.2,2.2 0 0 1 8.2,12.8 Z" />
+    </group>
+</vector>

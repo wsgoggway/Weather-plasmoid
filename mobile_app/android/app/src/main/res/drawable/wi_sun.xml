@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Солнце: диск + 8 лучей (круглые штрихи). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:strokeColor="#FFD54F"
+        android:strokeWidth="1.8"
+        android:strokeLineCap="round"
+        android:pathData="M12,2.6 L12,4.9 M12,19.1 L12,21.4 M2.6,12 L4.9,12 M19.1,12 L21.4,12 M5.3,5.3 L6.9,6.9 M17.1,17.1 L18.7,18.7 M18.7,5.3 L17.1,6.9 M6.9,17.1 L5.3,18.7" />
+    <path
+        android:fillColor="#FFD54F"
+        android:pathData="M12,7.1 a4.9,4.9 0 1,0 0,9.8 a4.9,4.9 0 1,0 0,-9.8 Z" />
+</vector>

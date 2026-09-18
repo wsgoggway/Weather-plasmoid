@@ -9,16 +9,17 @@ import android.os.Bundle
 import android.widget.RemoteViews
 
 /**
- * Домашний виджет «Погода» — собирательный образ виджетов Apple Weather /
- * Pixel Weather / Gismeteo: текущая погода, почасовая лента, метрики,
- * прогноз на 3 дня.
+ * Домашний виджет «Погода» v2 — собирательный образ Apple Weather /
+ * Pixel Weather: векторные иконки, фон-градиент под погоду и время суток,
+ * крупная тонкая температура, цветные max/min, почасовая лента, плитки
+ * метрик, прогноз на 3 дня.
 
- * Данные пишет Dart-сторона через плагин home_widget (prefs
- * "HomeWidgetPreferences"); onUpdate и системные периодические обновления
- * перерисовывают сохранённые значения. Тап открывает приложение.
+ * Данные пишет Dart-сторона через home_widget (prefs
+ * "HomeWidgetPreferences"); onUpdate перерисовывает сохранённые значения.
+ * Тап открывает приложение.
 
- * Адаптивность: при высоте >= 180dp — полный вид 4×3; меньше — часы
- * и метрики скрываются (setViewVisibility), остаётся компакт 4×2.
+ * Адаптивность: высота >= 180dp — полный вид 4×3; меньше — часы и метрики
+ * скрываются (setViewVisibility), остаётся компакт 4×2.
  */
 class WeatherWidgetProvider : AppWidgetProvider() {
     override fun onUpdate(
@@ -37,7 +38,6 @@ class WeatherWidgetProvider : AppWidgetProvider() {
         appWidgetId: Int,
         newOptions: Bundle?,
     ) {
-        // Пользователь изменил размер — пересобираем видимость секций.
         render(context, appWidgetManager, appWidgetId)
     }
 
@@ -50,27 +50,43 @@ class WeatherWidgetProvider : AppWidgetProvider() {
                 context.getSharedPreferences("HomeWidgetPreferences", Context.MODE_PRIVATE)
             val large = isLarge(manager.getAppWidgetOptions(appWidgetId))
             val views = RemoteViews(context.packageName, R.layout.weather_widget).apply {
-                setTextViewText(R.id.widget_emoji, prefs.getString("emoji", "🌤️"))
-                setTextViewText(R.id.widget_temp, prefs.getString("temp", "--°"))
+                // Фон под погоду (Pixel style).
+                setInt(
+                    R.id.widget_root,
+                    "setBackgroundResource",
+                    backgroundFor(prefs.getString("theme", "clear_night")!!),
+                )
+
+                // Город | ↑max ↓min.
                 setTextViewText(R.id.widget_city, prefs.getString("city", "Погода"))
+                setTextViewText(R.id.widget_hi, prefs.getString("hi", ""))
+                setTextViewText(R.id.widget_lo, prefs.getString("lo", ""))
+
+                // Герой: иконка + температура + состояние/ощущается.
+                setImageViewResource(
+                    R.id.widget_icon,
+                    iconFor(prefs.getString("icon", "cloud")!!),
+                )
+                setTextViewText(R.id.widget_temp, prefs.getString("temp", "--°"))
                 setTextViewText(
                     R.id.widget_condition,
                     prefs.getString("condition", "Откройте приложение"),
                 )
-                setTextViewText(R.id.widget_details, prefs.getString("details", ""))
+                setTextViewText(R.id.widget_feels, prefs.getString("feels", ""))
 
                 // Секции полного вида.
                 val sectionVisibility =
                     if (large) android.view.View.VISIBLE else android.view.View.GONE
                 setViewVisibility(R.id.widget_hourly_section, sectionVisibility)
                 setViewVisibility(R.id.widget_metrics_section, sectionVisibility)
+
                 val hourTimeIds = intArrayOf(
                     R.id.widget_h0_time, R.id.widget_h1_time, R.id.widget_h2_time,
                     R.id.widget_h3_time, R.id.widget_h4_time,
                 )
-                val hourEmojiIds = intArrayOf(
-                    R.id.widget_h0_emoji, R.id.widget_h1_emoji, R.id.widget_h2_emoji,
-                    R.id.widget_h3_emoji, R.id.widget_h4_emoji,
+                val hourIconIds = intArrayOf(
+                    R.id.widget_h0_icon, R.id.widget_h1_icon, R.id.widget_h2_icon,
+                    R.id.widget_h3_icon, R.id.widget_h4_icon,
                 )
                 val hourTempIds = intArrayOf(
                     R.id.widget_h0_temp, R.id.widget_h1_temp, R.id.widget_h2_temp,
@@ -78,29 +94,76 @@ class WeatherWidgetProvider : AppWidgetProvider() {
                 )
                 for (i in hourTimeIds.indices) {
                     setTextViewText(hourTimeIds[i], prefs.getString("h${i}_time", ""))
-                    setTextViewText(hourEmojiIds[i], prefs.getString("h${i}_emoji", ""))
+                    setImageViewResource(
+                        hourIconIds[i],
+                        iconFor(prefs.getString("h${i}_icon", "cloud")!!),
+                    )
                     setTextViewText(hourTempIds[i], prefs.getString("h${i}_temp", ""))
                 }
-                setTextViewText(R.id.widget_m_humidity, prefs.getString("m_humidity", ""))
-                setTextViewText(R.id.widget_m_wind, prefs.getString("m_wind", ""))
-                setTextViewText(R.id.widget_m_pressure, prefs.getString("m_pressure", ""))
-                setTextViewText(R.id.widget_m_uv, prefs.getString("m_uv", ""))
 
-                // Прогноз на 3 дня.
-                setTextViewText(R.id.widget_d0_label, prefs.getString("d0_label", ""))
-                setTextViewText(R.id.widget_d0, prefs.getString("d0", ""))
-                setTextViewText(R.id.widget_d1_label, prefs.getString("d1_label", ""))
-                setTextViewText(R.id.widget_d1, prefs.getString("d1", ""))
-                setTextViewText(R.id.widget_d2_label, prefs.getString("d2_label", ""))
-                setTextViewText(R.id.widget_d2, prefs.getString("d2", ""))
+                // Метрики: 4 плитки «значение + подпись».
+                val valueIds = intArrayOf(
+                    R.id.widget_mv0, R.id.widget_mv1, R.id.widget_mv2, R.id.widget_mv3,
+                )
+                val labelIds = intArrayOf(
+                    R.id.widget_ml0, R.id.widget_ml1, R.id.widget_ml2, R.id.widget_ml3,
+                )
+                for (i in valueIds.indices) {
+                    setTextViewText(valueIds[i], prefs.getString("mv$i", ""))
+                    setTextViewText(labelIds[i], prefs.getString("ml$i", ""))
+                }
+
+                // Прогноз на 3 дня: подпись / иконка / ↑max / ↓min.
+                val labelDayIds = intArrayOf(
+                    R.id.widget_d0_label, R.id.widget_d1_label, R.id.widget_d2_label,
+                )
+                val dayIconIds = intArrayOf(
+                    R.id.widget_d0_icon, R.id.widget_d1_icon, R.id.widget_d2_icon,
+                )
+                val dayMaxIds = intArrayOf(
+                    R.id.widget_d0_max, R.id.widget_d1_max, R.id.widget_d2_max,
+                )
+                val dayMinIds = intArrayOf(
+                    R.id.widget_d0_min, R.id.widget_d1_min, R.id.widget_d2_min,
+                )
+                for (i in labelDayIds.indices) {
+                    setTextViewText(labelDayIds[i], prefs.getString("d${i}_label", ""))
+                    setImageViewResource(
+                        dayIconIds[i],
+                        iconFor(prefs.getString("d${i}_icon", "cloud")!!),
+                    )
+                    setTextViewText(dayMaxIds[i], prefs.getString("d${i}_max", ""))
+                    setTextViewText(dayMinIds[i], prefs.getString("d${i}_min", ""))
+                }
+
                 setTextViewText(R.id.widget_updated, prefs.getString("updated", ""))
                 setOnClickPendingIntent(R.id.widget_root, launchIntent(context))
             }
             manager.updateAppWidget(appWidgetId, views)
         }
 
-        private fun getResourceId(name: String): Int =
-            R.id::class.java.getField(name).getInt(null)
+        private fun backgroundFor(theme: String): Int = when (theme) {
+            "clear_day" -> R.drawable.wbg_clear_day
+            "partly" -> R.drawable.wbg_partly
+            "cloud" -> R.drawable.wbg_cloud
+            "rain" -> R.drawable.wbg_rain
+            "snow" -> R.drawable.wbg_snow
+            "storm" -> R.drawable.wbg_storm
+            "fog" -> R.drawable.wbg_fog
+            else -> R.drawable.wbg_clear_night
+        }
+
+        private fun iconFor(icon: String): Int = when (icon) {
+            "sun" -> R.drawable.wi_sun
+            "moon" -> R.drawable.wi_moon
+            "partly" -> R.drawable.wi_partly
+            "partly_night" -> R.drawable.wi_partly_night
+            "rain" -> R.drawable.wi_rain
+            "snow" -> R.drawable.wi_snow
+            "storm" -> R.drawable.wi_storm
+            "fog" -> R.drawable.wi_fog
+            else -> R.drawable.wi_cloud
+        }
 
         private fun isLarge(options: Bundle?): Boolean {
             val h = options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 0) ?: 0

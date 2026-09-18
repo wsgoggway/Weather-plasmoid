@@ -39,18 +39,8 @@ const _forecastJson = {
   },
   "daily": {
     "time": ["2026-09-18", "2026-09-19", "2026-09-20", "2026-09-21"],
-    "sunrise": [
-      "2026-09-18T06:38",
-      "2026-09-19T06:40",
-      "2026-09-20T06:42",
-      "2026-09-21T06:44",
-    ],
-    "sunset": [
-      "2026-09-18T19:20",
-      "2026-09-19T19:17",
-      "2026-09-20T19:15",
-      "2026-09-21T19:13",
-    ],
+    "sunrise": ["2026-09-18T06:38", "2026-09-19T06:40", "2026-09-20T06:42", "2026-09-21T06:44"],
+    "sunset": ["2026-09-18T19:20", "2026-09-19T19:17", "2026-09-20T19:15", "2026-09-21T19:13"],
     "uv_index_max": [3.4, 4.0, 2.0, 2.0],
     "precipitation_sum": [5.6, 0.0, 1.2, 0.0],
     "weather_code": [63, 80, 0, 1],
@@ -60,10 +50,10 @@ const _forecastJson = {
     "wind_speed_10m_max": [4.5, 3.0, 2.0, 2.0],
   },
   "hourly": {
-    "time": ["2026-09-18T14:00", "2026-09-18T15:00"],
-    "temperature_2m": [17.4, 17.8],
-    "weather_code": [63, 63],
-    "precipitation_probability": [90, 85],
+    "time": ["2026-09-18T14:00", "2026-09-18T15:00", "2026-09-18T16:00"],
+    "temperature_2m": [17.4, 17.8, 17.1],
+    "weather_code": [63, 61, 3],
+    "precipitation_probability": [90, 85, 40],
   },
 };
 
@@ -83,61 +73,99 @@ Future<WeatherState> makeState() async {
 }
 
 void main() {
-  test("buildData: основные поля виджета", () async {
+  group("ключи иконки/темы виджета", () {
+    test("погода и время суток", () {
+      expect(WidgetSync.widgetIconKey(0, true), "sun");
+      expect(WidgetSync.widgetIconKey(0, false), "moon");
+      expect(WidgetSync.widgetIconKey(1, true), "partly");
+      expect(WidgetSync.widgetIconKey(2, false), "partly_night");
+      expect(WidgetSync.widgetIconKey(3, true), "cloud");
+      expect(WidgetSync.widgetIconKey(63, true), "rain");
+      expect(WidgetSync.widgetIconKey(71, true), "snow");
+      expect(WidgetSync.widgetIconKey(95, true), "storm");
+      expect(WidgetSync.widgetIconKey(45, true), "fog");
+    });
+
+    test("фоновые градиенты", () {
+      expect(WidgetSync.widgetThemeKey(0, true), "clear_day");
+      expect(WidgetSync.widgetThemeKey(0, false), "clear_night");
+      expect(WidgetSync.widgetThemeKey(1, true), "partly");
+      expect(WidgetSync.widgetThemeKey(2, false), "clear_night");
+      expect(WidgetSync.widgetThemeKey(3, true), "cloud");
+      expect(WidgetSync.widgetThemeKey(63, true), "rain");
+      expect(WidgetSync.widgetThemeKey(95, true), "storm");
+      expect(WidgetSync.widgetThemeKey(45, true), "fog");
+    });
+  });
+
+  test("buildData: герой + hi/lo + тема", () async {
     final state = await makeState();
     final data = WidgetSync.buildData(state);
 
-    expect(data["emoji"], "🌧️"); // код 63
+    expect(data["theme"], "rain"); // код 63
+    expect(data["icon"], "rain");
     expect(data["temp"], "18°");
     expect(data["city"], "Москва");
     expect(data["condition"], "Дождь");
-    expect(data["details"], "Ощущается 15°C · 💧90%");
+    expect(data["feels"], "Ощущается 15°C");
+    expect(data["hi"], "↑18°"); // 18.4 → 18
+    expect(data["lo"], "↓10°"); // 9.8 → 10
     expect(data["updated"], contains("Обновлено в "));
   });
 
-  test("buildData: три колонки прогноза с подписями дней", () async {
+  test("buildData: три дня — иконка + цветные max/min", () async {
     final state = await makeState();
     final data = WidgetSync.buildData(state);
 
     expect(data["d0_label"], "Сегодня");
-    expect(data["d0"], "🌧️ 18°/10°"); // 9.8 → 10
+    expect(data["d0_icon"], "rain");
+    expect(data["d0_max"], "18°");
+    expect(data["d0_min"], "10°");
     expect(data["d1_label"], "Завтра");
-    expect(data["d1"], "🌦️ 21°/11°"); // VS16 из маппинга
-    // 2026-09-20 — воскресенье.
-    expect(data["d2_label"], "Вс");
-    expect(data["d2"], "☀️ 24°/13°");
+    expect(data["d1_icon"], "rain"); // код 80 — ливень
+    expect(data["d2_label"], "Вс"); // 2026-09-20 — воскресенье
+    expect(data["d2_icon"], "sun"); // код 0
   });
 
-  test("buildData: почасовая лента — Сейчас + 4 часа", () async {
+  test("buildData: почасовая лента — Сейчас + 4 часа, ночная иконка", () async {
     final state = await makeState();
     final data = WidgetSync.buildData(state);
 
     expect(data["h0_time"], "Сейчас");
-    expect(data["h0_emoji"], "🌧️");
+    expect(data["h0_icon"], "rain"); // код 63
     expect(data["h0_temp"], "17°");
     expect(data["h1_time"], "15"); // "2026-09-18T15:00"
-    expect(data["h1_temp"], "18°");
+    expect(data["h2_icon"], "cloud"); // код 3
+    // Дополнительные колонки без данных — пустые.
+    expect(data["h3_time"], "");
+    expect(data["h3_temp"], "");
   });
 
-  test("buildData: метрики в одну строку", () async {
+  test("buildData: метрики плитками «значение + подпись»", () async {
     final state = await makeState();
     final data = WidgetSync.buildData(state);
 
-    expect(data["m_humidity"], "💧62%");
-    expect(data["m_wind"], "💨3.7 м/с");
-    expect(data["m_pressure"], "🧭754 мм рт.");
-    expect(data["m_uv"], "☀️УФ 3"); // 3.4 → 3
+    expect(data["mv0"], "3.7 м/с");
+    expect(data["ml0"], "Ветер");
+    expect(data["mv1"], "62%");
+    expect(data["ml1"], "Влажность");
+    expect(data["mv2"], "754 мм");
+    expect(data["ml2"], "Давление");
+    expect(data["mv3"], "3"); // 3.4 → 3
+    expect(data["ml3"], "УФ-индекс");
   });
 
   test("buildData: часы кончились — ключи пустые, не устаревшие", () async {
     final state = await makeState();
     // Единственный час в ответе — остальные 4 колонки должны очиститься.
-    state.hours = const [HourItem(time: "2026-09-18T14:00", temp: 17, emoji: "🌧️", condition: "Дождь", precProb: 90)];
+    state.hours = const [
+      HourItem(time: "2026-09-18T14:00", wmo: 63, temp: 17, emoji: "🌧️", condition: "Дождь", precProb: 90),
+    ];
     final data = WidgetSync.buildData(state);
 
     expect(data["h0_temp"], "17°");
     expect(data["h1_time"], "");
-    expect(data["h1_emoji"], "");
+    expect(data["h1_temp"], "");
     expect(data["h4_temp"], "");
   });
 

@@ -51,6 +51,7 @@ class CurrentData {
 
 class DayItem {
   final String date;
+  final int wmo;
   final int tempMax;
   final int tempMin;
   final String emoji;
@@ -60,6 +61,7 @@ class DayItem {
 
   const DayItem({
     required this.date,
+    required this.wmo,
     required this.tempMax,
     required this.tempMin,
     required this.emoji,
@@ -71,6 +73,7 @@ class DayItem {
 
 class HourItem {
   final String time;
+  final int wmo;
   final int temp;
   final String emoji;
   final String condition;
@@ -78,6 +81,7 @@ class HourItem {
 
   const HourItem({
     required this.time,
+    required this.wmo,
     required this.temp,
     required this.emoji,
     required this.condition,
@@ -262,6 +266,7 @@ class WeatherState extends ChangeNotifier {
         dayList.add(
           DayItem(
             date: times[i],
+            wmo: dw,
             tempMax: (_num(_at(maxArr, i)) ?? 0).round(),
             tempMin: (_num(_at(minArr, i)) ?? 0).round(),
             emoji: di.emoji,
@@ -296,6 +301,7 @@ class WeatherState extends ChangeNotifier {
       hourList.add(
         HourItem(
           time: hTimes[j],
+          wmo: hw,
           temp: (_num(_at(hTemps, j)) ?? 0).round(),
           emoji: hi.emoji,
           condition: hi.text,
