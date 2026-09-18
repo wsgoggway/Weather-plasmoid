@@ -1,8 +1,24 @@
-# Open-Meteo Weather — KDE Plasma 6 Plasmoid
+# Open-Meteo Weather — KDE Plasma 6 Plasmoid + Android-приложение
 
-Виджет погоды для KDE Plasma 6, использующий **бесплатный** API [Open-Meteo](https://open-meteo.com).
+Виджет погоды для KDE Plasma 6 и Android-приложение на Flutter, использующие **бесплатный** API [Open-Meteo](https://open-meteo.com).
 
 > **Не требует API-ключа.** Просто установите и пользуйтесь.
+
+## 📱 Android-приложение
+
+В [`mobile_app/`](./mobile_app) — Flutter-приложение «Погода»: собирательный
+образ по мотивам популярных погодных приложений (Apple Weather, Яндекс
+Погода, Gismeteo, Carrot) с дизайном и характером этого виджета:
+
+- динамический погодный фон + стеклянные карточки (glassmorphism)
+- «Осадки сейчас» — nowcast на 2 часа (minutely_15)
+- избранные города, поиск, GPS
+- график температуры, прогноз до 16 дней, плитки метрик, AQI
+- предупреждения о резких изменениях (перепад t°, гроза, ветер)
+- тот же сарказм «ощущается как»
+
+Сборка: `cd mobile_app && mise install && mise exec -- flutter build apk --release`.
+Подробности — в [mobile_app/README.md](./mobile_app/README.md).
 
 ## Возможности
 

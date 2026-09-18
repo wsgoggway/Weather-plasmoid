@@ -1,0 +1,5 @@
+# Тулчейн мобильного приложения (пиннится локально, как в cool_weather_app)
+[tools]
+flutter = "latest"
+android-sdk = "latest"
+java = "21"

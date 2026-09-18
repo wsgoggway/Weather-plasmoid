@@ -1,3 +1,4 @@
 # Agent-session artifacts
 .mimosa/
 pi-session-*.html
+.zcode/
