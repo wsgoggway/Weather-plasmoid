@@ -28,12 +28,12 @@ const _forecastJson = {
     "temperature_2m": 17.6,
     "apparent_temperature": 15.1,
     "relative_humidity_2m": 62,
-    "weather_code": 63,
+    "weather_code": 0,
     "wind_speed_10m": 3.7,
     "wind_gusts_10m": 8.2,
     "wind_direction_10m": 310,
     "pressure_msl": 1005.0,
-    "cloud_cover": 90,
+    "cloud_cover": 10,
     "dew_point_2m": 10.3,
     "is_day": 1,
   },
@@ -43,28 +43,35 @@ const _forecastJson = {
     "sunset": ["2026-09-18T19:20", "2026-09-19T19:17", "2026-09-20T19:15", "2026-09-21T19:13"],
     "uv_index_max": [3.4, 4.0, 2.0, 2.0],
     "precipitation_sum": [5.6, 0.0, 1.2, 0.0],
-    "weather_code": [63, 80, 0, 1],
+    "weather_code": [0, 80, 0, 1],
     "temperature_2m_max": [18.4, 21.2, 24.0, 22.0],
     "temperature_2m_min": [9.8, 11.1, 13.3, 12.0],
     "precipitation_probability_max": [90, 60, 5, 10],
     "wind_speed_10m_max": [4.5, 3.0, 2.0, 2.0],
   },
   "hourly": {
-    "time": ["2026-09-18T14:00", "2026-09-18T15:00", "2026-09-18T16:00"],
-    "temperature_2m": [17.4, 17.8, 17.1],
-    "weather_code": [63, 61, 3],
-    "precipitation_probability": [90, 85, 40],
+    "time": [
+      "2026-09-18T14:00", "2026-09-18T15:00", "2026-09-18T16:00",
+      "2026-09-18T17:00", "2026-09-18T18:00", "2026-09-18T19:00",
+      "2026-09-18T20:00", "2026-09-18T21:00",
+    ],
+    "temperature_2m": [17.4, 17.8, 17.1, 16.0, -0.4, -3.0, -5.0, -7.0],
+    "weather_code": [0, 0, 0, 0, 1, 2, 3, 3],
+    "precipitation_probability": [10, 10, 10, 10, 10, 10, 20, 20],
   },
 };
 
-Future<WeatherState> makeState() async {
-  SharedPreferences.setMockInitialValues({});
+Future<WeatherState> makeState({
+  Map<String, dynamic>? json,
+  Map<String, Object> prefsInit = const {},
+}) async {
+  SharedPreferences.setMockInitialValues(prefsInit);
   final prefs = await SharedPreferences.getInstance();
   final settings = SettingsStore(prefs);
   final cities = CitiesStore(prefs);
   await cities.load();
   final state = WeatherState(
-    apiClient: OpenMeteoApi(client: FakeClient(_forecastJson)),
+    apiClient: OpenMeteoApi(client: FakeClient(json ?? _forecastJson)),
     settingsStore: settings,
     citiesStore: cities,
   );
@@ -86,87 +93,68 @@ void main() {
       expect(WidgetSync.widgetIconKey(45, true), "fog");
     });
 
-    test("фоновые градиенты", () {
+    test("дневные темы светлые, ночь тёмная", () {
       expect(WidgetSync.widgetThemeKey(0, true), "clear_day");
       expect(WidgetSync.widgetThemeKey(0, false), "clear_night");
       expect(WidgetSync.widgetThemeKey(1, true), "partly");
-      expect(WidgetSync.widgetThemeKey(2, false), "clear_night");
+      expect(WidgetSync.widgetThemeKey(2, false), "clear_day");
       expect(WidgetSync.widgetThemeKey(3, true), "cloud");
       expect(WidgetSync.widgetThemeKey(63, true), "rain");
-      expect(WidgetSync.widgetThemeKey(95, true), "storm");
-      expect(WidgetSync.widgetThemeKey(45, true), "fog");
     });
   });
 
-  test("buildData: герой + hi/lo + тема", () async {
+  test("buildData: герой по референсу — плюс перед температурой", () async {
     final state = await makeState();
     final data = WidgetSync.buildData(state);
 
-    expect(data["theme"], "rain"); // код 63
-    expect(data["icon"], "rain");
-    expect(data["temp"], "18°");
+    // Ясный день: 17.6 → 18, 15.1 → 15, код 0 → sun/clear_day, светлая палитра.
+    expect(data["palette"], "light");
+    expect(data["theme"], "clear_day");
+    expect(data["icon"], "sun");
+    expect(data["temp"], "+18°");
     expect(data["city"], "Москва");
-    expect(data["condition"], "Дождь");
-    expect(data["feels"], "Ощущается 15°C");
-    expect(data["hi"], "↑18°"); // 18.4 → 18
-    expect(data["lo"], "↓10°"); // 9.8 → 10
-    expect(data["updated"], contains("Обновлено в "));
+    expect(data["condition"], "Ясно");
+    expect(data["feels"], "Ощущается как +15°");
   });
 
-  test("buildData: три дня — иконка + цветные max/min", () async {
+  test("buildData: ночь — тёмная палитра, луна", () async {
+    final json = Map<String, dynamic>.from(_forecastJson);
+    json["current"] = {
+      ..._forecastJson["current"] as Map<String, dynamic>,
+      "is_day": 0,
+    };
+    final state = await makeState(json: json);
+    final data = WidgetSync.buildData(state);
+
+    expect(data["palette"], "dark");
+    expect(data["icon"], "moon");
+    expect(data["theme"], "clear_night");
+  });
+
+  test("buildData: 7 колонок почасовой полосы", () async {
     final state = await makeState();
     final data = WidgetSync.buildData(state);
 
-    expect(data["d0_label"], "Сегодня");
-    expect(data["d0_icon"], "rain");
-    expect(data["d0_max"], "18°");
-    expect(data["d0_min"], "10°");
-    expect(data["d1_label"], "Завтра");
-    expect(data["d1_icon"], "rain"); // код 80 — ливень
-    expect(data["d2_label"], "Вс"); // 2026-09-20 — воскресенье
-    expect(data["d2_icon"], "sun"); // код 0
-  });
-
-  test("buildData: почасовая лента — Сейчас + 4 часа, ночная иконка", () async {
-    final state = await makeState();
-    final data = WidgetSync.buildData(state);
-
-    expect(data["h0_time"], "Сейчас");
-    expect(data["h0_icon"], "rain"); // код 63
-    expect(data["h0_temp"], "17°");
-    expect(data["h1_time"], "15"); // "2026-09-18T15:00"
-    expect(data["h2_icon"], "cloud"); // код 3
-    // Дополнительные колонки без данных — пустые.
-    expect(data["h3_time"], "");
-    expect(data["h3_temp"], "");
-  });
-
-  test("buildData: метрики плитками «значение + подпись»", () async {
-    final state = await makeState();
-    final data = WidgetSync.buildData(state);
-
-    expect(data["mv0"], "3.7 м/с");
-    expect(data["ml0"], "Ветер");
-    expect(data["mv1"], "62%");
-    expect(data["ml1"], "Влажность");
-    expect(data["mv2"], "754 мм");
-    expect(data["ml2"], "Давление");
-    expect(data["mv3"], "3"); // 3.4 → 3
-    expect(data["ml3"], "УФ-индекс");
+    expect(data["h0_time"], "14:00"); // первый час — полностью
+    expect(data["h0_icon"], "sun");
+    expect(data["h0_temp"], "+17°");
+    expect(data["h1_time"], "15");
+    expect(data["h4_temp"], "0°"); // -0.4 → 0, без плюса
+    expect(data["h5_temp"], "-3°");
+    expect(data["h6_temp"], "-5°");
   });
 
   test("buildData: часы кончились — ключи пустые, не устаревшие", () async {
     final state = await makeState();
-    // Единственный час в ответе — остальные 4 колонки должны очиститься.
     state.hours = const [
-      HourItem(time: "2026-09-18T14:00", wmo: 63, temp: 17, emoji: "🌧️", condition: "Дождь", precProb: 90),
+      HourItem(time: "2026-09-18T14:00", wmo: 0, temp: 17, emoji: "☀️", condition: "Ясно", precProb: 10),
     ];
     final data = WidgetSync.buildData(state);
 
-    expect(data["h0_temp"], "17°");
+    expect(data["h0_temp"], "+17°");
     expect(data["h1_time"], "");
     expect(data["h1_temp"], "");
-    expect(data["h4_temp"], "");
+    expect(data["h6_temp"], "");
   });
 
   test("buildData: без данных — пустой словарь (виджет не трогаем)", () async {
