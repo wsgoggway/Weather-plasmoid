@@ -1,6 +1,7 @@
-# AGENT.md — Rules for the Agent (Open-Meteo Weather Plasmoid)
+# AGENT.md — Rules for the Agent (Open-Meteo Weather Plasmoid + Calendar Plugin)
 
-Weather widget for **KDE Plasma 6** in pure QML/JS. Free APIs, no API keys required.
+Weather widget for **KDE Plasma 6** in pure QML/JS, plus a C++ calendar events plugin (§17).
+Free APIs, no API keys required.
 All identifiers/code are in English; descriptions are now in English as well.
 
 ---
@@ -9,7 +10,7 @@ All identifiers/code are in English; descriptions are now in English as well.
 
 - A **Plasma 6 plasmoid (applet)** using `KPackageStructure: Plasma/Applet`.
 - Id: `com.github.vladimirm.openmeteo-weather`.
-- **No C++/Python/compilation.** Only QML + JavaScript + JSON metadata.
+- **No C++/Python/compilation.** Only QML + JavaScript + JSON metadata. (Exception: the separate C++ calendar plugin — §17.)
 - Weather source: **Open-Meteo** (no key). Air quality: **Open-Meteo Air Quality API** (European AQI, no key). City geocoding — Open-Meteo Geocoding, IP geolocation — ipwhois.app (HTTPS), fallback ip-api.com (HTTP).
 
 ---
@@ -256,3 +257,35 @@ git add -A && git commit -m "feat: …"                  # commit
 git checkout master && git merge --no-ff feat/<name>   # merge into master
 curl -s "https://api.open-meteo.com/v1/forecast?latitude=55.75&longitude=37.62&daily=sunrise,sunset&timezone=Europe/Moscow&forecast_days=1"
 ```
+
+## 17. Calendar Plugin (`calendar-plugin/`, C++)
+
+A **separate C++ subproject** — a Plasma calendar events plugin (`CalendarEvents::CalendarEventsPlugin`,
+KF6::CalendarEvents from kdeclarative) that shows Open-Meteo daily weather inside the stock
+digital-clock calendar: colored dots (temperature color), `subLabel` day labels («+4°»), and one
+all-day event per day in the agenda. Details and user docs: `calendar-plugin/README.md`.
+
+- **No ECM.** The host has no `extra-cmake-modules`; build with plain Qt6/KF6 CMake
+  (`qt_add_plugin` + `Q_PLUGIN_METADATA`). Do not introduce ECM dependency casually.
+- Layout: `src/` (plugin glue `weathereventsplugin.*`, data layer `weatherdatastore.*`,
+  WMO mapping `wmoconditions.*`, QML config module `confighelper.*` + `configui.qml`),
+  `test/` (QTest suite + `probe_load` / `probe_fetch` console probes + curl-captured fixtures).
+- Config: `~/.config/weathereventsrc` `[General]` (latitude, longitude, temperatureUnit, cityName);
+  the plugin reacts via `KConfigWatcher`. User-facing strings are hardcoded Russian (§8 applies).
+- Commands (host build is the established workflow for this subproject — it links host KF6/Plasma;
+  containers do not apply):
+  ```bash
+  cmake -S calendar-plugin -B calendar-plugin/build -DCMAKE_BUILD_TYPE=Release
+  cmake --build calendar-plugin/build                    # zero warnings (-Wall -Wextra -Wpedantic)
+  ctest --test-dir calendar-plugin/build --output-on-failure
+  calendar-plugin/build/test/probe_load  <abs>/weatherevents.so   # plugin loads, interface OK
+  calendar-plugin/build/test/probe_fetch [lat lon unit]           # real-network e2e (throwaway cache)
+  ./calendar-plugin/install.sh                           # user-run: sudo install + plasmashell --replace
+  ```
+- DoD for plugin changes: zero-warning build, green `ctest`, green `probe_load`, `qmllint` clean on
+  `configui.qml`, security-sensitive parsing bounds-checked, then §9 flow and manual calendar check
+  (enable «Погода» in clock settings) when plasmashell integration changed.
+- Install destination is a **system path** (`/usr/lib/qt6/plugins/plasmacalendarplugins/`) —
+  plasmashell does not search user plugin dirs; the sudo steps are always user-run.
+- §12/§13 items about `qmllint`/settings apply to the QML files here too; the KCM golden rule (§2)
+  applies to `configui.qml` mutatis mutandis (write-back only on user-initiated signals/Apply).
