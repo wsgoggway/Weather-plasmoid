@@ -23,6 +23,7 @@
 #include <algorithm>
 #include <array>
 #include <chrono>
+#include <limits>
 #include <tuple>
 #include <utility>
 
@@ -47,16 +48,38 @@ bool fail(QString *error, const QString &message)
     return false;
 }
 
+// Hostile JSON numbers (1e300) must not be UB on the double->int conversion.
+int clampToInt(double value)
+{
+    if (!(value > static_cast<double>(std::numeric_limits<int>::min()))) {
+        return std::numeric_limits<int>::min();
+    }
+    if (!(value < static_cast<double>(std::numeric_limits<int>::max()))) {
+        return std::numeric_limits<int>::max();
+    }
+    return static_cast<int>(value);
+}
+
 // JSON nulls (Open-Meteo reports them for some past-day columns) count as 0.
 int intOrZero(const QJsonValue &value)
 {
-    return value.isDouble() ? static_cast<int>(value.toDouble()) : 0;
+    return value.isDouble() ? clampToInt(value.toDouble()) : 0;
 }
 
 // Numeric day fields are rounded at parse time (repo rule).
 int roundedOrZero(const QJsonValue &value)
 {
-    return value.isDouble() ? qRound(value.toDouble()) : 0;
+    if (!value.isDouble()) {
+        return 0;
+    }
+    const double v = value.toDouble();
+    if (!(v > static_cast<double>(std::numeric_limits<int>::min()) + 1.0)) {
+        return std::numeric_limits<int>::min();
+    }
+    if (!(v < static_cast<double>(std::numeric_limits<int>::max()) - 1.0)) {
+        return std::numeric_limits<int>::max();
+    }
+    return qRound(v);
 }
 
 double doubleOrZero(const QJsonValue &value)
@@ -400,6 +423,9 @@ bool WeatherDataStore::saveCache() const
         return false;
     }
     QSaveFile file(m_cacheFilePath);
+    // The cache holds the approximate home location - keep it owner-only.
+    // QSaveFile applies the permissions to the final file at commit().
+    file.setPermissions(QFile::ReadOwner | QFile::WriteOwner);
     if (!file.open(QIODevice::WriteOnly)
             || !file.write(QJsonDocument(root).toJson(QJsonDocument::Compact)) || !file.commit()) {
         qWarning("weatherevents: cannot write cache %s: %s",

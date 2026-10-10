@@ -82,6 +82,8 @@ KCMUtils.SimpleKCM {
             Kirigami.FormData.label: "Результаты:"
             model: citySearch.results
             textRole: "label"
+            // Entries come from the geocoding API - never render as rich text.
+            textFormat: Text.PlainText
             enabled: count > 0
 
             onActivated: index => {
@@ -173,6 +175,8 @@ KCMUtils.SimpleKCM {
                 return city + "Координаты: " + weatherConfig.latitude.toFixed(4) + ", "
                     + weatherConfig.longitude.toFixed(4);
             }
+            // cityName comes from the geocoding API - never render it as rich text.
+            textFormat: Text.PlainText
             color: Kirigami.Theme.disabledTextColor
         }
     }
