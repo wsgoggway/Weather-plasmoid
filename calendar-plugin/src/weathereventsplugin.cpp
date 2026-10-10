@@ -86,7 +86,7 @@ WeatherEventsPlugin::WeatherEventsPlugin(QObject *parent)
         const bool locationChanged = loadConfig();
         if (locationChanged) {
             applyConfiguredLocation();
-            rebuildAndEmit(true);
+            rebuildAndEmit(false);
         }
     });
 }
@@ -143,7 +143,7 @@ void WeatherEventsPlugin::loadEventsForDateRange(const QDate &startDate, const Q
     }
     rememberRange(startDate, endDate);
     m_store->ensureRange(startDate, endDate);
-    rebuildAndEmit(locationChanged);
+    rebuildAndEmit(true);
 }
 
 void WeatherEventsPlugin::rememberRange(const QDate &startDate, const QDate &endDate)
@@ -156,7 +156,16 @@ void WeatherEventsPlugin::rememberRange(const QDate &startDate, const QDate &end
     }
 }
 
-void WeatherEventsPlugin::rebuildAndEmit(bool locationChanged)
+bool WeatherEventsPlugin::sameEvent(const CalendarEvents::EventData &a,
+                                    const CalendarEvents::EventData &b)
+{
+    return a.uid() == b.uid() && a.title() == b.title() && a.description() == b.description()
+        && a.eventColor() == b.eventColor() && a.startDateTime() == b.startDateTime()
+        && a.endDateTime() == b.endDateTime() && a.isAllDay() == b.isAllDay()
+        && a.type() == b.type();
+}
+
+void WeatherEventsPlugin::rebuildAndEmit(bool fullEmission)
 {
     QMultiHash<QDate, CalendarEvents::EventData> data;
     QHash<QDate, CalendarEvents::CalendarEventsPlugin::SubLabel> subLabels;
@@ -187,16 +196,50 @@ void WeatherEventsPlugin::rebuildAndEmit(bool locationChanged)
         data.insert(day, makeDayEvent(*dayWeather));
     }
 
-    if (locationChanged) {
-        // The old events belong to the old location: retire them explicitly.
-        for (auto it = m_lastData.constBegin(); it != m_lastData.constEnd(); ++it) {
-            Q_EMIT eventRemoved(it->uid());
-        }
+    // DaysModel::onDataReady APPENDS to a per-date multihash without any uid
+    // dedupe, and the UI clears its model only on a range re-request. So a
+    // full re-emission is safe only right after such a request; every other
+    // emission (async fetch completion, config change) must be a diff:
+    // brand-new uids -> dataReady, changed uids -> eventModified, gone uids
+    // -> eventRemoved (those signals exist exactly for this).
+    if (fullEmission) {
+        m_lastData = data;
+        Q_EMIT dataReady(data);
+        Q_EMIT subLabelReady(subLabels);
+        return;
     }
 
-    m_lastData = data;
-    Q_EMIT dataReady(data);
+    QHash<QString, CalendarEvents::EventData> newByUid;
+    newByUid.reserve(data.size());
+    for (auto it = data.constBegin(); it != data.constEnd(); ++it) {
+        newByUid.insert(it->uid(), *it);
+    }
+    QHash<QString, CalendarEvents::EventData> oldByUid;
+    oldByUid.reserve(m_lastData.size());
+    for (auto it = m_lastData.constBegin(); it != m_lastData.constEnd(); ++it) {
+        oldByUid.insert(it->uid(), *it);
+    }
+
+    QMultiHash<QDate, CalendarEvents::EventData> fresh;
+    for (auto it = newByUid.constBegin(); it != newByUid.constEnd(); ++it) {
+        const auto oldIt = oldByUid.constFind(it.key());
+        if (oldIt == oldByUid.constEnd()) {
+            fresh.insert(it->startDateTime().date(), *it);
+        } else if (!sameEvent(*oldIt, *it)) {
+            Q_EMIT eventModified(*it);
+        }
+    }
+    for (auto it = oldByUid.constBegin(); it != oldByUid.constEnd(); ++it) {
+        if (!newByUid.contains(it.key())) {
+            Q_EMIT eventRemoved(it.key());
+        }
+    }
+    if (!fresh.isEmpty()) {
+        Q_EMIT dataReady(fresh);
+    }
     Q_EMIT subLabelReady(subLabels);
+
+    m_lastData = data;
 }
 
 QString WeatherEventsPlugin::dayEventTitle(const WeatherDataStore::DayWeather &day) const
