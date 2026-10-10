@@ -82,8 +82,6 @@ KCMUtils.SimpleKCM {
             Kirigami.FormData.label: "Результаты:"
             model: citySearch.results
             textRole: "label"
-            // Entries come from the geocoding API - never render as rich text.
-            textFormat: Text.PlainText
             enabled: count > 0
 
             onActivated: index => {
@@ -187,6 +185,13 @@ KCMUtils.SimpleKCM {
 
         property var results: []
 
+        // ComboBox renders display text as AutoText (no textFormat property on
+        // QQC2.ComboBox), so API-provided names must be stripped of angle
+        // brackets before they can switch it into rich-text (StyledText) mode.
+        function sanitizeText(value) {
+            return String(value).replace(/[<>]/g, "");
+        }
+
         function search(query) {
             const trimmed = query.trim();
             if (trimmed.length < 2) {
@@ -210,8 +215,12 @@ KCMUtils.SimpleKCM {
                     const payload = JSON.parse(request.responseText);
                     const entries = Array.isArray(payload.results) ? payload.results : [];
                     citySearch.results = entries.map(entry => ({
-                        label: entry.name + (entry.admin1 ? ", " + entry.admin1 : "")
-                            + (entry.country ? ", " + entry.country : ""),
+                        // ComboBox renders display text as AutoText: strip angle
+                        // brackets so API-provided names can never switch it into
+                        // rich-text (StyledText) mode.
+                        label: sanitizeText(entry.name
+                            + (entry.admin1 ? ", " + entry.admin1 : "")
+                            + (entry.country ? ", " + entry.country : "")),
                         latitude: entry.latitude,
                         longitude: entry.longitude,
                     }));
