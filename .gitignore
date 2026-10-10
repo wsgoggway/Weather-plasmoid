@@ -2,3 +2,6 @@
 .mimosa/
 pi-session-*.html
 .zcode/
+
+# calendar-plugin build output
+calendar-plugin/build/

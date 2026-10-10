@@ -1,0 +1,16 @@
+{
+    "KPlugin": {
+        "Authors": [
+            {
+                "Name": "Vladimir Manichev"
+            }
+        ],
+        "Description": "Погода Open-Meteo в календаре",
+        "Icon": "weather-clouds",
+        "Id": "weatherevents",
+        "License": "MIT",
+        "Name": "Погода",
+        "Version": "0.2.0"
+    },
+    "X-KDE-PlasmaCalendar-ConfigUi": "weatherevents/configui.qml"
+}
