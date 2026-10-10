@@ -39,7 +39,12 @@ private:
     // location is configured (0/0 counts as unset).
     bool loadConfig();
     void applyConfiguredLocation();
-    void rebuildAndEmit(bool locationChanged);
+    // fullEmission=true re-sends the whole set (the UI just cleared its model
+    // and re-requested the range); otherwise only the diff against the last
+    // emission goes out (see rebuildAndEmit).
+    void rebuildAndEmit(bool fullEmission);
+    [[nodiscard]] static bool sameEvent(const CalendarEvents::EventData &a,
+                                        const CalendarEvents::EventData &b);
     void rememberRange(const QDate &startDate, const QDate &endDate);
 
     [[nodiscard]] CalendarEvents::EventData makeDayEvent(const WeatherDataStore::DayWeather &day) const;
