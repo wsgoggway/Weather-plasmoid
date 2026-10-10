@@ -133,9 +133,17 @@ void WeatherEventsPlugin::loadEventsForDateRange(const QDate &startDate, const Q
     if (!startDate.isValid() || !endDate.isValid()) {
         return;
     }
+    // The settings page writes the config from this same process, and the file
+    // watcher may have been created before the config file existed (its watch
+    // then silently never attaches) - so re-read on every UI request: opening
+    // the calendar always picks up the latest location.
+    const bool locationChanged = loadConfig();
+    if (locationChanged) {
+        applyConfiguredLocation();
+    }
     rememberRange(startDate, endDate);
     m_store->ensureRange(startDate, endDate);
-    rebuildAndEmit(false);
+    rebuildAndEmit(locationChanged);
 }
 
 void WeatherEventsPlugin::rememberRange(const QDate &startDate, const QDate &endDate)
