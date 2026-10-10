@@ -51,3 +51,20 @@ target_link_libraries(probe_fetch PRIVATE
 target_compile_options(probe_fetch PRIVATE
     -Wall -Wextra -Wpedantic
 )
+
+# Instantiates the settings page through a real QQmlEngine: the local qmllint
+# build silently mis-checks files, so this is the authoritative check that the
+# page the clock dialog will load is actually loadable.
+find_package(Qt6 REQUIRED COMPONENTS Quick)
+add_executable(probe_configui probe_configui.cpp)
+target_link_libraries(probe_configui PRIVATE
+    Qt6::Core
+    Qt6::Quick
+)
+target_compile_options(probe_configui PRIVATE
+    -Wall -Wextra -Wpedantic
+)
+target_compile_definitions(probe_configui PRIVATE
+    CONFIGUI_PATH="${CMAKE_CURRENT_SOURCE_DIR}/../src/configui.qml"
+)
+add_test(NAME probe_configui COMMAND probe_configui)
