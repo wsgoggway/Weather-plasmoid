@@ -21,10 +21,20 @@ CONFIG_PAGE="${PLUGIN_DIR}/weatherevents/configui.qml"
 QML_MODULE_DIR="/usr/lib/qt6/qml/org/kde/plasma/private/weathereventsconfig"
 
 restart_shell() {
-    # This restarts the user's plasmashell; backgrounded so this script can exit.
-    echo "Restarting plasmashell (this restarts your desktop shell)..."
-    nohup plasmashell --replace >/dev/null 2>&1 &
-    disown
+    # Prefer the systemd user unit: a hand-spawned `plasmashell --replace`
+    # runs outside supervision and then makes later `systemctl --user restart`
+    # calls no-op (the unit's new instance sees an existing shell and exits).
+    # The unit may be temporarily dead while a hand-spawned shell runs, so
+    # kill any leftover instance before starting the unit.
+    echo "Restarting plasmashell via systemd (this restarts your desktop shell)..."
+    if systemctl --user list-unit-files plasma-plasmashell.service 2>/dev/null | grep -q plasma-plasmashell; then
+        killall plasmashell 2>/dev/null || true
+        sleep 2
+        systemctl --user start plasma-plasmashell.service
+    else
+        nohup plasmashell --replace >/dev/null 2>&1 &
+        disown
+    fi
 }
 
 if [[ "${1:-}" == "uninstall" ]]; then
