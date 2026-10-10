@@ -19,7 +19,9 @@
 
 #include <QCoreApplication>
 #include <QDate>
+#include <QDir>
 #include <QEventLoop>
+#include <QFileInfo>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QPluginLoader>
@@ -37,7 +39,11 @@ int main(int argc, char *argv[])
         std::fprintf(stderr, "Usage: probe_load <path-to-plugin-.so>\n");
         return 1;
     }
-    const QString pluginPath = QString::fromLocal8Bit(argv[1]);
+    // QPluginLoader does not resolve relative paths against the caller's
+    // cwd on all platforms, so normalize before use.
+    const QString pluginPath =
+        QFileInfo(QDir::current().absoluteFilePath(QString::fromLocal8Bit(argv[1])))
+            .absoluteFilePath();
 
     QPluginLoader loader(pluginPath);
 
