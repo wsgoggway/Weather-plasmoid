@@ -10,7 +10,7 @@
         "Id": "weatherevents",
         "License": "MIT",
         "Name": "Погода",
-        "Version": "0.1.0"
+        "Version": "0.2.0"
     },
-    "X-KDE-PlasmaCalendar-ConfigUi": "configui.qml"
+    "X-KDE-PlasmaCalendar-ConfigUi": "weatherevents/configui.qml"
 }

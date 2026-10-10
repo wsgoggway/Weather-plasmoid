@@ -34,3 +34,20 @@ target_compile_definitions(test_weatherdatastore PRIVATE
     FIXTURES_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures"
 )
 add_test(NAME test_weatherdatastore COMMAND test_weatherdatastore)
+
+# Real-network e2e probe (data layer only). NOT registered with ctest: it
+# needs internet and is run manually during verification.
+add_executable(probe_fetch probe_fetch.cpp
+    ../src/weatherdatastore.cpp
+    ../src/wmoconditions.cpp
+)
+target_include_directories(probe_fetch PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src
+)
+target_link_libraries(probe_fetch PRIVATE
+    Qt6::Core
+    Qt6::Network
+)
+target_compile_options(probe_fetch PRIVATE
+    -Wall -Wextra -Wpedantic
+)

@@ -8,8 +8,9 @@
 //   2. KPluginMetaData built from the plugin file is valid and has a name;
 //   3. the .so actually loads;
 //   4. the instance qobject_casts to CalendarEvents::CalendarEventsPlugin;
-//   5. loadEventsForDateRange(today, today) emits exactly one event via
-//      dataReady.
+//   5. loadEventsForDateRange(today, today) emits dataReady; with no
+//      location configured (the probe isolates XDG_CONFIG_HOME/XDG_CACHE_HOME
+//      in a fresh temp dir) the set is empty and no fetch is attempted.
 //
 // Usage: probe_load <path-to-plugin-.so>
 // Prints "PROBE OK events=N" and exits 0 on success; prints a precise
@@ -25,6 +26,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QPluginLoader>
+#include <QTemporaryDir>
 #include <QTimer>
 
 #include <CalendarEvents/CalendarEventsPlugin>
@@ -33,6 +35,18 @@
 
 int main(int argc, char *argv[])
 {
+    // Isolate from the user's real config and cache BEFORE anything resolves
+    // XDG paths: the probe must be deterministic and must never trigger a
+    // network fetch or touch ~/.config/weathereventsrc / the real cache.
+    QTemporaryDir scratchDir(QDir::tempPath() + QLatin1String("/weatherevents-probe-load-XXXXXX"));
+    if (!scratchDir.isValid()) {
+        std::fprintf(stderr, "PROBE FAILED: cannot create a scratch dir in %s\n",
+                     qUtf8Printable(QDir::tempPath()));
+        return 1;
+    }
+    qputenv("XDG_CONFIG_HOME", QFile::encodeName(scratchDir.path() + QLatin1String("/config")));
+    qputenv("XDG_CACHE_HOME", QFile::encodeName(scratchDir.path() + QLatin1String("/cache")));
+
     QCoreApplication app(argc, argv);
 
     if (argc != 2) {
@@ -92,8 +106,9 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    // 5. One stub event for today.
-    int eventCount = 0;
+    // 5. dataReady must be emitted; without a configured location the set is
+    //    empty and no fetch is attempted (offline-deterministic).
+    int eventCount = -1;
     QObject::connect(plugin,
                      &CalendarEvents::CalendarEventsPlugin::dataReady,
                      [&eventCount](const QMultiHash<QDate, CalendarEvents::EventData> &data) {
@@ -107,8 +122,14 @@ int main(int argc, char *argv[])
     QTimer::singleShot(2000, &loop, &QEventLoop::quit);
     loop.exec();
 
-    if (eventCount != 1) {
-        std::fprintf(stderr, "PROBE FAILED: expected 1 event, got %d\n", eventCount);
+    if (eventCount < 0) {
+        std::fprintf(stderr, "PROBE FAILED: dataReady was not emitted\n");
+        return 1;
+    }
+    if (eventCount != 0) {
+        std::fprintf(stderr,
+                     "PROBE FAILED: expected 0 events without a configured location, got %d\n",
+                     eventCount);
         return 1;
     }
 
