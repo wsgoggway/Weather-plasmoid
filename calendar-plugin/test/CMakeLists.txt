@@ -1,3 +1,5 @@
+find_package(Qt6 REQUIRED COMPONENTS Test)
+
 add_executable(probe_load probe_load.cpp)
 target_link_libraries(probe_load PRIVATE
     Qt6::Core
@@ -7,3 +9,28 @@ target_link_libraries(probe_load PRIVATE
 target_compile_options(probe_load PRIVATE
     -Wall -Wextra -Wpedantic
 )
+
+# Offline unit tests for the data layer (store + WMO conditions), compiled
+# directly from the plugin sources.
+add_executable(test_weatherdatastore
+    test_weatherdatastore.cpp
+    ../src/weatherdatastore.cpp
+    ../src/wmoconditions.cpp
+)
+target_include_directories(test_weatherdatastore PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src
+)
+target_link_libraries(test_weatherdatastore PRIVATE
+    Qt6::Test
+    Qt6::Core
+    Qt6::Network
+)
+target_compile_options(test_weatherdatastore PRIVATE
+    -Wall -Wextra -Wpedantic
+)
+# Fixture directory is baked in so the test behaves identically under ctest
+# and under a manual run, regardless of the current working directory.
+target_compile_definitions(test_weatherdatastore PRIVATE
+    FIXTURES_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures"
+)
+add_test(NAME test_weatherdatastore COMMAND test_weatherdatastore)

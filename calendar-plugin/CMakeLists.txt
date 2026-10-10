@@ -28,6 +28,8 @@ qt_add_plugin(weatherevents)
 set_target_properties(weatherevents PROPERTIES PREFIX "")
 target_sources(weatherevents PRIVATE
     src/weathereventsplugin.cpp
+    src/weatherdatastore.cpp
+    src/wmoconditions.cpp
 )
 target_include_directories(weatherevents PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
@@ -47,4 +49,5 @@ install(TARGETS weatherevents
     LIBRARY DESTINATION /usr/lib/qt6/plugins/plasmacalendarplugins
 )
 
+enable_testing()
 add_subdirectory(test)
